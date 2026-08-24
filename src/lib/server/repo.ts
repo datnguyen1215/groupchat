@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { db } from './db';
 import { agentSkills, agents, documents, entries, skills, steps, threads } from './db/schema';
 import { agentDto, documentDto, skillDto, type Stat } from './serialize';
@@ -420,6 +420,19 @@ export const setAgentStatus = async (
 			updatedAt: new Date()
 		})
 		.where(eq(agents.id, agentId));
+};
+
+/**
+ * Clears agents left `busy` by a process that died mid-turn. `finally` cannot
+ * run if the server is killed, so without this a crash leaves a presence row
+ * spinning forever and the only fix is editing the database by hand.
+ */
+export const clearStaleBusy = async (olderThanMs = 5 * 60_000) => {
+	const cutoff = new Date(Date.now() - olderThanMs);
+	await db
+		.update(agents)
+		.set({ status: 'idle', statusLabel: 'Idle', busyThreadId: null })
+		.where(and(eq(agents.status, 'busy'), lt(agents.updatedAt, cutoff)));
 };
 
 /** Presence rows: who is mid-turn in this thread, and the last step each ran. */

@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { MAX_STEPS, chatModel, noThinking } from './model';
 import { orchestratorPrompt, workerPrompt } from './prompts';
 import { orchestratorTools, workerTools, type ToolContext } from './tools';
-import { appendActivity, appendStep, listEntries, setAgentStatus } from '../repo';
+import { appendActivity, appendMessage, appendStep, listEntries, setAgentStatus } from '../repo';
 
 /** Tool calls that are the agent talking, not the agent working. */
 export const SPEECH = new Set(['send_chat_message', 'finish']);
@@ -87,21 +87,32 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
 
 	await setAgentStatus(agentId, 'busy', 'Working', threadId);
 
-	const ctx: ToolContext = { threadId, agentId, tag: agent.role || 'agent' };
-	const result = await generateText({
-		model: chatModel,
-		providerOptions: noThinking,
-		system: workerPrompt(agent.name, agent.role, agent.description),
-		prompt: `Here is the conversation so far:\n\n${await transcript(threadId)}\n\nYour task: ${task}`,
-		tools: workerTools(ctx),
-		stopWhen: stepCountIs(MAX_STEPS)
-	});
+	try {
+		const ctx: ToolContext = { threadId, agentId, tag: agent.role || 'agent' };
+		const result = await generateText({
+			model: chatModel,
+			providerOptions: noThinking,
+			system: workerPrompt(agent.name, agent.role, agent.description),
+			prompt: `Here is the conversation so far:\n\n${await transcript(threadId)}\n\nYour task: ${task}`,
+			tools: workerTools(ctx),
+			stopWhen: stepCountIs(MAX_STEPS)
+		});
 
-	await recordSteps(threadId, agent.name, result.steps);
-	await setAgentStatus(agentId, 'idle', 'Idle');
+		await recordSteps(threadId, agent.name, result.steps);
 
-	/** `finish` leaves no text, so the last thing said in chat is the report. */
-	return result.text.trim() || `${agent.name} finished the task.`;
+		/** `finish` leaves no text, so the last thing said in chat is the report. */
+		return result.text.trim() || `${agent.name} finished the task.`;
+	} catch (error) {
+		/**
+		 * Handed back as the report rather than rethrown: the orchestrator asked
+		 * this agent for an answer, and "I failed" is an answer it can act on.
+		 */
+		console.error(`[agent loop] ${agent.name}`, error);
+		return `${agent.name} could not finish: ${describe(error)}`;
+	} finally {
+		/** Always. A stuck `busy` row is a presence indicator that never clears. */
+		await setAgentStatus(agentId, 'idle', 'Idle');
+	}
 };
 
 /**
@@ -115,18 +126,41 @@ export const runOrchestrator = async (threadId: string) => {
 
 	await setAgentStatus(orch.id, 'busy', 'Thinking', threadId);
 
-	const ctx: ToolContext = { threadId, agentId: orch.id, tag: 'orch' };
-	const result = await generateText({
-		model: chatModel,
-		providerOptions: noThinking,
-		system: orchestratorPrompt(orch.name),
-		prompt: `Here is the conversation so far:\n\n${await transcript(threadId)}\n\nDecide what happens next.`,
-		tools: orchestratorTools(ctx, (agentId, task) => runWorker(threadId, agentId, task)),
-		stopWhen: stepCountIs(MAX_STEPS)
-	});
+	try {
+		const ctx: ToolContext = { threadId, agentId: orch.id, tag: 'orch' };
+		const result = await generateText({
+			model: chatModel,
+			providerOptions: noThinking,
+			system: orchestratorPrompt(orch.name),
+			prompt: `Here is the conversation so far:\n\n${await transcript(threadId)}\n\nDecide what happens next.`,
+			tools: orchestratorTools(ctx, (agentId, task) => runWorker(threadId, agentId, task)),
+			stopWhen: stepCountIs(MAX_STEPS)
+		});
 
-	await recordSteps(threadId, orch.name, result.steps);
-	await setAgentStatus(orch.id, 'idle', 'Idle');
+		await recordSteps(threadId, orch.name, result.steps);
+	} catch (error) {
+		/**
+		 * The turn is over and nobody is coming. Saying so in the thread is the
+		 * only way the failure reaches the person who is waiting on a reply —
+		 * there is no streaming channel to report it on.
+		 */
+		console.error('[agent loop]', error);
+		await appendMessage({
+			threadId,
+			authorId: orch.id,
+			tag: 'orch',
+			paragraphs: [`The turn failed: ${describe(error)}`]
+		});
+	} finally {
+		await setAgentStatus(orch.id, 'idle', 'Idle');
+	}
+};
+
+/** The one line of an error worth putting in front of a person. */
+export const describe = (error: unknown) => {
+	if (error && typeof error === 'object' && 'message' in error)
+		return String((error as { message: unknown }).message).split('\n')[0];
+	return String(error);
 };
 
 /**

@@ -1,6 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import {
 	appendMessage,
+	clearStaleBusy,
 	getThread,
 	listBusyAgents,
 	listDocuments,
@@ -12,6 +13,9 @@ import { startTurn } from '$lib/server/ai/loop';
 export const load = async ({ params }) => {
 	const thread = await getThread(params.id);
 	if (!thread) error(404, 'Thread not found');
+
+	/** A turn cut short by a restart would otherwise spin here forever. */
+	await clearStaleBusy();
 
 	const [entries, activity, busy, documents] = await Promise.all([
 		listEntries(params.id),

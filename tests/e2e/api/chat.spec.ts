@@ -108,3 +108,70 @@ test.describe('presence is separate from the message stream', () => {
     }
   });
 });
+
+test.describe('a failed turn does not strand the agent', () => {
+  /**
+   * The loop resets status in a `finally`, so a failure clears it. A process
+   * killed mid-turn never reaches that, which is what `clearStaleBusy` covers —
+   * a busy row older than the cutoff is treated as abandoned.
+   */
+  const AGENT = 'stale-probe';
+
+  test.beforeAll(async () => {
+    const sql = connect();
+    try {
+      await sql`
+        insert into agents (id, name, initials, color, kind, role)
+        values (${AGENT}, 'Stale', 'S', '#7aa2ff', 'research', 'prober')
+        on conflict (id) do nothing
+      `;
+    } finally {
+      await sql.end();
+    }
+  });
+
+  test('a busy row left by a crash is cleared on the next page load', async ({ page }) => {
+    const sql = connect();
+    try {
+      /* Older than the five-minute cutoff: the mark of a turn nobody is running. */
+      await sql`
+        update agents
+        set status = 'busy', status_label = 'Thinking',
+            busy_thread_id = 'retrieval-eval',
+            updated_at = now() - interval '30 minutes'
+        where id = ${AGENT}
+      `;
+
+      await page.goto('/chats/retrieval-eval');
+
+      const [row] = await sql`select status, busy_thread_id from agents where id = ${AGENT}`;
+      expect(row.status).toBe('idle');
+      expect(row.busy_thread_id).toBeNull();
+    } finally {
+      await sql.end();
+    }
+  });
+
+  test('a turn that just started is left alone', async ({ page }) => {
+    const sql = connect();
+    try {
+      await sql`
+        update agents
+        set status = 'busy', status_label = 'Thinking',
+            busy_thread_id = 'retrieval-eval', updated_at = now()
+        where id = ${AGENT}
+      `;
+
+      await page.goto('/chats/retrieval-eval');
+
+      const [row] = await sql`select status from agents where id = ${AGENT}`;
+      expect(row.status).toBe('busy');
+    } finally {
+      await sql`
+        update agents set status = 'idle', status_label = 'Idle', busy_thread_id = null
+        where id = ${AGENT}
+      `;
+      await sql.end();
+    }
+  });
+});

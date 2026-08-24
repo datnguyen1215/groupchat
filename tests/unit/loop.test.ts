@@ -8,7 +8,12 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('$env/dynamic/private', () => ({ env: { DEEPSEEK_API_KEY: 'test' } }));
 vi.mock('../../src/lib/server/db', () => ({ db: {}, schema: {} }));
 
-const { SPEECH, barsFor, detailOf } = await import('../../src/lib/server/ai/loop');
+const {
+  SPEECH,
+  barsFor,
+  detailOf,
+  describe: errorLine
+} = await import('../../src/lib/server/ai/loop');
 
 const call = (toolName: string) => ({ toolName });
 
@@ -70,5 +75,22 @@ describe('detailOf', () => {
   it('returns empty for a tool that takes no arguments', () => {
     expect(detailOf({})).toBe('');
     expect(detailOf(undefined)).toBe('');
+  });
+});
+
+describe('describe', () => {
+  it('uses the error message', () => {
+    expect(errorLine(new Error('Authentication Fails'))).toBe('Authentication Fails');
+  });
+
+  /* Provider errors dump headers and a body; the thread gets the first line only. */
+  it('keeps only the first line of a multi-line provider error', () => {
+    const err = new Error('Authentication Fails, your api key is invalid\nstatusCode: 401\n{...}');
+    expect(errorLine(err)).toBe('Authentication Fails, your api key is invalid');
+  });
+
+  it('falls back to the value when it is not an error object', () => {
+    expect(errorLine('socket hang up')).toBe('socket hang up');
+    expect(errorLine(undefined)).toBe('undefined');
   });
 });
