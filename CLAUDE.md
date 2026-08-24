@@ -20,6 +20,13 @@
 - Postgres via `postgres` (no ORM).
 - Vitest for unit tests. Playwright for e2e.
 
+## Live updates
+
+- SSE pushes thread changes to the browser. One stream for the whole app.
+- The bus is **in-memory** (`src/lib/server/events/bus.ts`). Keep it that way.
+- Single node. No plan for more than one. Do not add Redis or `LISTEN/NOTIFY`.
+- Every write in `repo.ts` publishes. Add a write? Publish from it.
+
 ## Ports
 
 - Every service in this project runs on a port in the **10200+** range.

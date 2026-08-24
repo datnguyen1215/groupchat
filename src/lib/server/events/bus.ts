@@ -5,10 +5,10 @@ import type { LiveEvent } from './types';
  * everything downstream calls `subscribe`, and neither knows this is an
  * in-process fan-out.
  *
- * In-memory is correct while the app is one `adapter-node` process: a publish
- * and its subscribers are always in the same heap. A second process would not
- * see these events, so multi-process means reimplementing exactly these two
- * functions over Postgres `LISTEN/NOTIFY` — the callers do not change.
+ * In-memory on purpose, and staying that way: this app is one `adapter-node`
+ * process, so a publish and its subscribers are always in the same heap. A
+ * second process would not see these events — if that ever changes, these two
+ * functions are the only thing to reimplement and no caller moves.
  */
 type Listener = (event: LiveEvent) => void;
 
