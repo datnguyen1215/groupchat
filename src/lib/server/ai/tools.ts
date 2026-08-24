@@ -27,6 +27,18 @@ export type ToolContext = {
 	tag: string;
 };
 
+/** A window of body text around the first match, so search results are skimmable. */
+export const excerpt = (body: string, needle: string) => {
+	const at = body.toLowerCase().indexOf(needle);
+	if (at < 0) return '';
+	const start = Math.max(0, at - 40);
+	const slice = body
+		.slice(start, start + 160)
+		.replace(/\s+/g, ' ')
+		.trim();
+	return `${start > 0 ? '...' : ''}${slice}${start + 160 < body.length ? '...' : ''}`;
+};
+
 /** Read-side tools. Both the orchestrator and the workers get these. */
 const readTools = (ctx: ToolContext) => ({
 	list_skills: tool({
@@ -70,6 +82,27 @@ const readTools = (ctx: ToolContext) => ({
 			if (!doc) return { error: `No document with id "${id}".` };
 			return { id: doc.id, name: doc.name, body: doc.body };
 		}
+	}),
+
+	search_documents: tool({
+		description:
+			'Find documents in this thread whose name or body contains some text. ' +
+			'Use this before writing a new document, to check whether one already exists.',
+		inputSchema: z.object({
+			query: z.string().describe('The text to look for. Case-insensitive.')
+		}),
+		execute: async ({ query }) => {
+			const needle = query.trim().toLowerCase();
+			if (!needle) return [];
+			const all = await listDocuments(ctx.threadId);
+			const hits = all.filter((d) => `${d.name} ${d.body}`.toLowerCase().includes(needle));
+			return hits.map((d) => ({
+				id: d.id,
+				name: d.name,
+				author: d.author,
+				excerpt: excerpt(d.body, needle)
+			}));
+		}
 	})
 });
 
@@ -88,6 +121,56 @@ const writeTools = (ctx: ToolContext) => ({
 				.insert(documents)
 				.values({ id, name, threadId: ctx.threadId, authorId: ctx.agentId, body });
 			return { id, name };
+		}
+	}),
+
+	update_document: tool({
+		description:
+			'Revise a document that already exists in this thread. Replaces the body and ' +
+			'bumps its version. Prefer this over writing a near-duplicate document.',
+		inputSchema: z.object({
+			id: z.string().describe('The document id from list_documents or search_documents.'),
+			body: z.string().describe('The full new markdown body. This replaces the old body.'),
+			name: z.string().optional().describe('A new name, if it should be renamed.')
+		}),
+		execute: async ({ id, body, name }) => {
+			const doc = await getDocument(id);
+			if (!doc) return { error: `No document with id "${id}".` };
+			/** Thread-scoped on purpose: an agent revises its own thread's docs, not another's. */
+			if (doc.threadId !== ctx.threadId)
+				return { error: `Document "${id}" belongs to another thread.` };
+
+			await db
+				.update(documents)
+				.set({
+					body,
+					...(name ? { name } : {}),
+					/** The same in-place bump the PATCH route does, so both paths agree. */
+					version: sql`${documents.version} + 1`,
+					updatedAt: new Date()
+				})
+				.where(eq(documents.id, id));
+
+			return { id, name: name ?? doc.name, version: doc.versionNumber + 1 };
+		}
+	}),
+
+	delete_document: tool({
+		description:
+			'Delete a document from this thread. Use this only for a document that is ' +
+			'genuinely obsolete or was written by mistake.',
+		inputSchema: z.object({
+			id: z.string().describe('The document id from list_documents or search_documents.')
+		}),
+		execute: async ({ id }) => {
+			const doc = await getDocument(id);
+			if (!doc) return { error: `No document with id "${id}".` };
+			if (doc.threadId !== ctx.threadId)
+				return { error: `Document "${id}" belongs to another thread.` };
+
+			/** Messages referencing it keep their chip; `entries.doc_id` nulls out. */
+			await db.delete(documents).where(eq(documents.id, id));
+			return { id, deleted: true };
 		}
 	}),
 
