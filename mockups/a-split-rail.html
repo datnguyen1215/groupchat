@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Split Rail</title>
+<style>
+:root{
+  --bg:#fbfbfa; --panel:#fff; --ink:#1a1a19; --ink-2:#5c5b58; --ink-3:#8f8d88;
+  --line:#e8e6e1; --line-2:#f2f0ec; --accent:#3b6ef5; --accent-soft:#eef2fe;
+  --ok:#1a7f52; --run:#b8860b; --tool:#f6f5f2;
+  --r:10px; --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:14px/1.55 var(--sans);background:var(--bg);color:var(--ink);height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+.app{display:grid;grid-template-columns:236px 1fr;height:100vh}
+
+/* ── Left: threads ── */
+.rail{background:transparent;border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.brand{padding:16px 16px 12px;display:flex;align-items:center;gap:9px}
+.dot{width:16px;height:16px;border-radius:5px;background:var(--ink);flex:none}
+.brand b{font-size:13.5px;letter-spacing:-.01em}
+.rail-sec{padding:10px 16px 6px;font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between;align-items:center}
+.rail-sec button{color:var(--ink-3);font-size:15px;line-height:1;padding:0 2px;border-radius:4px}
+.rail-sec button:hover{background:var(--line-2);color:var(--ink)}
+.threads{overflow-y:auto;padding:0 8px;flex:1;min-height:0}
+.thread{padding:8px 9px;border-radius:8px;cursor:pointer;margin-bottom:1px}
+.thread:hover{background:var(--line-2)}
+.thread.on{background:var(--panel);box-shadow:0 0 0 1px var(--line),0 1px 2px rgba(0,0,0,.04)}
+.thread .t{font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;letter-spacing:-.005em}
+.pip{width:5px;height:5px;border-radius:50%;flex:none}
+.pip.live{background:var(--run);box-shadow:0 0 0 2.5px rgba(184,134,11,.16)}
+.pip.done{background:var(--line);}
+.thread .m{font-size:11.5px;color:var(--ink-3);margin-top:2px;padding-left:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rail-foot{border-top:1px solid var(--line);padding:8px}
+.navbtn{width:100%;text-align:left;padding:7px 9px;border-radius:8px;font-size:13px;color:var(--ink-2);display:flex;align-items:center;gap:8px}
+.navbtn:hover{background:var(--line-2);color:var(--ink)}
+.navbtn .k{margin-left:auto;font:10.5px var(--mono);color:var(--ink-3)}
+
+/* ── Center ── */
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{height:52px;flex:none;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 18px;gap:12px}
+.top h1{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+.crumb{font-size:12px;color:var(--ink-3)}
+.spacer{flex:1}
+.faces{display:flex}
+.face{width:24px;height:24px;border-radius:50%;border:2px solid var(--bg);margin-left:-7px;font-size:9.5px;font-weight:700;color:#fff;display:grid;place-items:center;letter-spacing:-.02em}
+.face:first-child{margin-left:0}
+.ghost{padding:5px 11px;border-radius:7px;font-size:12.5px;color:var(--ink-2);border:1px solid var(--line)}
+.ghost:hover{background:var(--panel);color:var(--ink)}
+.ghost.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* body split */
+.split{display:grid;grid-template-columns:1fr 300px;flex:1;min-height:0}
+.split.docs-open{grid-template-columns:1fr 300px 288px}
+.split.no-tl{grid-template-columns:1fr}
+.split.no-tl.docs-open{grid-template-columns:1fr 288px}
+
+/* conversation */
+.convcol{display:flex;flex-direction:column;min-width:0;min-height:0}
+.conv{overflow-y:auto;padding:26px 0 20px;min-width:0;flex:1}
+.wrap{max-width:660px;margin:0 auto;padding:0 22px}
+.msg{display:flex;gap:11px;margin-bottom:17px}
+.av{width:26px;height:26px;border-radius:7px;flex:none;font-size:10px;font-weight:700;color:#fff;display:grid;place-items:center;margin-top:1px;letter-spacing:-.02em}
+.who{display:flex;align-items:baseline;gap:7px;margin-bottom:2px}
+.who b{font-size:13px;font-weight:600;letter-spacing:-.005em}
+.role{font-size:10px;padding:1px 5px;border-radius:4px;background:var(--line-2);color:var(--ink-3);font-weight:500}
+.role.orch{background:var(--accent-soft);color:var(--accent)}
+.when{font-size:11px;color:var(--ink-3)}
+.body-t{font-size:13.5px;color:var(--ink);max-width:56ch}
+.body-t p+p{margin-top:7px}
+.msg.me .av{background:var(--ink)}
+
+/* inline doc chip */
+.chip{display:inline-flex;align-items:center;gap:6px;margin-top:7px;padding:5px 10px 5px 8px;border:1px solid var(--line);background:var(--panel);border-radius:7px;font-size:12.5px;cursor:pointer}
+.chip:hover{border-color:var(--ink-3)}
+.chip svg{opacity:.45}
+.chip .sz{color:var(--ink-3);font-size:11px}
+
+/* collapsed activity marker in stream */
+.act-inline{display:flex;gap:11px;margin-bottom:17px;align-items:center}
+.act-inline .line{width:26px;display:grid;place-items:center;flex:none}
+.act-inline .line i{width:1.5px;height:100%;background:var(--line);display:block;min-height:20px}
+.act-pill{font-size:12px;color:var(--ink-3);border:1px dashed var(--line);border-radius:20px;padding:3px 11px;cursor:pointer}
+.act-pill:hover{color:var(--ink-2);border-color:var(--ink-3);background:var(--panel)}
+
+/* composer */
+.comp{flex:none;padding:12px 22px 18px;background:var(--bg);border-top:1px solid var(--line)}
+.comp-in{max-width:660px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.comp-in:focus-within{border-color:var(--ink-3)}
+.comp-in textarea{width:100%;border:none;outline:none;resize:none;font:13.5px/1.5 var(--sans);background:none;min-height:21px}
+.comp-row{display:flex;align-items:center;gap:7px;margin-top:9px}
+.mini{font-size:11.5px;color:var(--ink-3);padding:3px 8px;border-radius:6px;border:1px solid var(--line)}
+.mini:hover{color:var(--ink);border-color:var(--ink-3)}
+.send{margin-left:auto;background:var(--ink);color:#fff;padding:5px 13px;border-radius:7px;font-size:12.5px;font-weight:500}
+
+/* ── Timeline lane ── */
+.tl{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--panel)}
+.tl-h{height:44px;flex:none;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid var(--line-2);gap:8px}
+.tl-h b{font-size:12px;font-weight:600;letter-spacing:-.005em}
+.tl-h .ct{font:10.5px var(--mono);color:var(--ink-3);background:var(--line-2);padding:1px 6px;border-radius:20px}
+.tl-body{overflow-y:auto;padding:12px 0 20px;flex:1}
+.node{position:relative;padding:0 14px 0 34px;margin-bottom:3px}
+.node::before{content:"";position:absolute;left:20px;top:20px;bottom:-3px;width:1.5px;background:var(--line-2)}
+.node:last-child::before{display:none}
+.node .ic{position:absolute;left:14px;top:5px;width:14px;height:14px;border-radius:50%;display:grid;place-items:center;font-size:8px;color:#fff;font-weight:700;z-index:1}
+.node .ic.ok{background:var(--ok)}
+.node .ic.run{background:var(--run)}
+.node .ic.sp{background:var(--accent)}
+.nrow{padding:4px 8px;border-radius:7px;cursor:pointer}
+.nrow:hover{background:var(--line-2)}
+.nrow .nm{font:11.5px var(--mono);letter-spacing:-.02em;display:flex;align-items:center;gap:6px}
+.nrow .nm span{margin-left:auto;font-size:10px;color:var(--ink-3);font-family:var(--sans)}
+.nrow .sub{font-size:11px;color:var(--ink-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node.child{padding-left:52px}
+.node.child .ic{left:32px}
+.node.child::before{left:38px}
+.spawn-tag{display:inline-block;font-size:9.5px;padding:0 5px;border-radius:4px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-family:var(--sans)}
+.grp-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);padding:14px 14px 5px;font-weight:600}
+
+/* ── Docs ── */
+.docs{border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.docs-h{height:44px;flex:none;display:flex;align-items:center;padding:0 14px;border-bottom:1px solid var(--line-2);gap:8px}
+.docs-h b{font-size:12px;font-weight:600}
+.docs-h button{margin-left:auto;color:var(--ink-3);font-size:16px;line-height:1}
+.docs-h button:hover{color:var(--ink)}
+.srch{margin:10px 12px 4px;position:relative}
+.srch input{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:6px 9px 6px 27px;font:12.5px var(--sans);outline:none}
+.srch input:focus{border-color:var(--ink-3);background:var(--panel)}
+.srch svg{position:absolute;left:8px;top:7px;opacity:.35}
+.dlist{overflow-y:auto;padding:6px 8px 16px;flex:1}
+.doc{padding:8px 9px;border-radius:8px;cursor:pointer;display:flex;gap:9px}
+.doc:hover{background:var(--line-2)}
+.doc .fi{width:15px;flex:none;opacity:.4;margin-top:1px}
+.doc .dn{font-size:12.5px;font-weight:500;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc .dm{font-size:11px;color:var(--ink-3);margin-top:1px}
+.tabs{display:flex;gap:2px;padding:8px 12px 2px}
+.tab{font-size:11.5px;padding:4px 9px;border-radius:6px;color:var(--ink-3);font-weight:500}
+.tab.on{background:var(--line-2);color:var(--ink)}
+.tab:hover{color:var(--ink)}
+
+/* ── Modal ── */
+.scrim{position:fixed;inset:0;background:rgba(26,26,25,.32);backdrop-filter:blur(3px);display:none;place-items:center;z-index:50;padding:5vh 20px}
+.scrim.on{display:grid}
+.modal{background:var(--panel);border-radius:14px;width:100%;max-width:760px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden}
+.m-h{padding:16px 22px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:12px;flex:none}
+.m-h h2{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.m-h .meta{font-size:11.5px;color:var(--ink-3);margin-top:2px}
+.m-h .x{margin-left:auto;font-size:19px;color:var(--ink-3);width:28px;height:28px;border-radius:7px;display:grid;place-items:center;flex:none}
+.m-h .x:hover{background:var(--line-2);color:var(--ink)}
+.m-b{overflow-y:auto;padding:26px 32px 40px}
+.m-f{border-top:1px solid var(--line-2);padding:10px 22px;display:flex;gap:7px;flex:none}
+
+/* markdown */
+.md{max-width:60ch;font-size:14px;line-height:1.68;color:#2a2a28}
+.md h1{font-size:23px;letter-spacing:-.02em;margin:0 0 14px;font-weight:650}
+.md h2{font-size:16.5px;letter-spacing:-.01em;margin:28px 0 9px;font-weight:650;padding-bottom:6px;border-bottom:1px solid var(--line-2)}
+.md h3{font-size:14px;margin:20px 0 6px;font-weight:650}
+.md p{margin:0 0 13px}
+.md ul,.md ol{margin:0 0 13px;padding-left:21px}
+.md li{margin-bottom:5px}
+.md code{font:12.5px var(--mono);background:var(--line-2);padding:1.5px 5px;border-radius:4px}
+.md pre{background:#f7f6f3;border:1px solid var(--line);border-radius:8px;padding:13px 15px;overflow-x:auto;margin:0 0 14px}
+.md pre code{background:none;padding:0;font-size:12px;line-height:1.6}
+.md blockquote{border-left:2.5px solid var(--line);padding-left:14px;color:var(--ink-2);margin:0 0 13px}
+.md table{border-collapse:collapse;width:100%;margin:0 0 14px;font-size:13px}
+.md th,.md td{border:1px solid var(--line);padding:6px 11px;text-align:left}
+.md th{background:var(--line-2);font-weight:600;font-size:12px}
+.md hr{border:none;border-top:1px solid var(--line);margin:22px 0}
+.md a{color:var(--accent);text-decoration:none}
+.md a:hover{text-decoration:underline}
+
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#dbd9d3;border-radius:9px;border:2.5px solid var(--bg)}
+.tl ::-webkit-scrollbar-thumb,.docs ::-webkit-scrollbar-thumb{border-color:var(--panel)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- THREADS -->
+  <aside class="rail">
+    <div class="brand"><div class="dot"></div><b>Consortium</b></div>
+    <div class="rail-sec">Threads <button title="New thread">+</button></div>
+    <div class="threads">
+      <div class="thread on"><div class="t"><i class="pip live"></i>Retrieval eval design</div><div class="m">Kestrel · 2m ago</div></div>
+      <div class="thread"><div class="t"><i class="pip done"></i>Ablation: context window</div><div class="m">Orchestrator · 1h</div></div>
+      <div class="thread"><div class="t"><i class="pip done"></i>Survey — sparse attention</div><div class="m">Wren · 4h</div></div>
+      <div class="thread"><div class="t"><i class="pip done"></i>Dataset licensing audit</div><div class="m">Finch · Yesterday</div></div>
+      <div class="thread"><div class="t"><i class="pip done"></i>Repro: Chen et al. 2025</div><div class="m">Kestrel · Mon</div></div>
+      <div class="thread"><div class="t"><i class="pip done"></i>Weekly synthesis</div><div class="m">Orchestrator · Mon</div></div>
+    </div>
+    <div class="rail-foot">
+      <button class="navbtn">◈ Skills <span class="k">⌘K</span></button>
+      <button class="navbtn">◇ Agents</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="top">
+      <h1>Retrieval eval design</h1>
+      <span class="crumb">4 agents · 31 messages</span>
+      <div class="spacer"></div>
+      <div class="faces">
+        <div class="face" style="background:#3b6ef5">O</div>
+        <div class="face" style="background:#0f9d58">K</div>
+        <div class="face" style="background:#d4574e">W</div>
+        <div class="face" style="background:#8b5cf6">F</div>
+      </div>
+      <button class="ghost on" id="tlBtn">Activity</button>
+      <button class="ghost" id="docBtn">Documents</button>
+    </div>
+
+    <div class="split" id="split">
+
+      <!-- CONVERSATION -->
+      <div class="convcol">
+      <div class="conv">
+        <div class="wrap">
+
+          <div class="msg">
+            <div class="av" style="background:#3b6ef5">O</div>
+            <div>
+              <div class="who"><b>Orchestrator</b><span class="role orch">orchestrator</span><span class="when">10:02</span></div>
+              <div class="body-t"><p>We need an eval for the retrieval layer. Kestrel, take metrics. Wren, find prior art.</p></div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <div class="av" style="background:#0f9d58">K</div>
+            <div>
+              <div class="who"><b>Kestrel</b><span class="role">analyst</span><span class="when">10:02</span></div>
+              <div class="body-t"><p>On it. Starting with recall@k and MRR.</p></div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <div class="av" style="background:#d4574e">W</div>
+            <div>
+              <div class="who"><b>Wren</b><span class="role">researcher</span><span class="when">10:03</span></div>
+              <div class="body-t"><p>BEIR is the obvious baseline. But our corpus is domain-specific — BEIR will overstate.</p></div>
+            </div>
+          </div>
+
+          <div class="act-inline">
+            <div class="line"><i></i></div>
+            <button class="act-pill">⚙ 3 tool calls · 1 agent spawned</button>
+          </div>
+
+          <div class="msg">
+            <div class="av" style="background:#d4574e">W</div>
+            <div>
+              <div class="who"><b>Wren</b><span class="role">researcher</span><span class="when">10:07</span></div>
+              <div class="body-t"><p>Pulled 14 papers. Three are directly relevant.</p></div>
+              <button class="chip" onclick="openDoc()">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l3 3v11H4z" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+                prior-art-retrieval-eval.md <span class="sz">2.1 KB</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="msg">
+            <div class="av" style="background:#0f9d58">K</div>
+            <div>
+              <div class="who"><b>Kestrel</b><span class="role">analyst</span><span class="when">10:08</span></div>
+              <div class="body-t"><p>Wren's right about the domain gap. I'd add nDCG@10 with graded relevance.</p></div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <div class="av" style="background:#8b5cf6">F</div>
+            <div>
+              <div class="who"><b>Finch</b><span class="role">critic</span><span class="when">10:09</span></div>
+              <div class="body-t"><p>Graded relevance needs annotators. Who labels?</p></div>
+            </div>
+          </div>
+
+          <div class="msg me">
+            <div class="av">DN</div>
+            <div>
+              <div class="who"><b>You</b><span class="when">10:11</span></div>
+              <div class="body-t"><p>Use LLM-as-judge for the first pass. Human spot-check 10%.</p></div>
+            </div>
+          </div>
+
+          <div class="act-inline">
+            <div class="line"><i></i></div>
+            <button class="act-pill">⚙ 2 tool calls</button>
+          </div>
+
+          <div class="msg">
+            <div class="av" style="background:#3b6ef5">O</div>
+            <div>
+              <div class="who"><b>Orchestrator</b><span class="role orch">orchestrator</span><span class="when">10:14</span></div>
+              <div class="body-t"><p>Agreed. Kestrel — write the protocol. Finch, draft the judge rubric as a skill so we reuse it.</p></div>
+            </div>
+          </div>
+
+          <div class="msg">
+            <div class="av" style="background:#8b5cf6">F</div>
+            <div>
+              <div class="who"><b>Finch</b><span class="role">critic</span><span class="when">10:16</span></div>
+              <div class="body-t"><p>Rubric's in. Registered as <code style="font:12px var(--mono);background:var(--line-2);padding:1px 5px;border-radius:4px">relevance-judge</code>.</p></div>
+              <button class="chip" onclick="openDoc()">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 1h5l3 3v11H4z" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+                eval-protocol-v1.md <span class="sz">4.8 KB</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="comp">
+        <div class="comp-in">
+          <textarea rows="1" placeholder="Message the group…"></textarea>
+          <div class="comp-row">
+            <button class="mini">@ agent</button>
+            <button class="mini">◈ skill</button>
+            <button class="send">Send</button>
+          </div>
+        </div>
+      </div>
+      </div><!-- /convcol -->
+
+      <!-- ACTIVITY TIMELINE -->
+      <div class="tl" id="tl">
+        <div class="tl-h"><b>Activity</b><span class="ct">14</span></div>
+        <div class="tl-body">
+          <div class="grp-lbl">10:03 — Wren</div>
+          <div class="node"><div class="ic ok">✓</div><div class="nrow"><div class="nm">web_search<span>1.2s</span></div><div class="sub">"retrieval eval benchmark domain shift"</div></div></div>
+          <div class="node"><div class="ic ok">✓</div><div class="nrow"><div class="nm">fetch_arxiv<span>3.4s</span></div><div class="sub">14 results</div></div></div>
+          <div class="node"><div class="ic sp">↳</div><div class="nrow"><div class="nm">spawn <span class="spawn-tag">agent</span><span>—</span></div><div class="sub">paper-reader × 3</div></div></div>
+          <div class="node child"><div class="ic ok">✓</div><div class="nrow"><div class="nm">reader-1<span>8s</span></div><div class="sub">BEIR (Thakur 2021)</div></div></div>
+          <div class="node child"><div class="ic ok">✓</div><div class="nrow"><div class="nm">reader-2<span>7s</span></div><div class="sub">Chen et al. 2025</div></div></div>
+          <div class="node child"><div class="ic ok">✓</div><div class="nrow"><div class="nm">reader-3<span>9s</span></div><div class="sub">LoTTE splits</div></div></div>
+          <div class="node"><div class="ic ok">✓</div><div class="nrow"><div class="nm">write_doc<span>0.4s</span></div><div class="sub">prior-art-retrieval-eval.md</div></div></div>
+
+          <div class="grp-lbl">10:12 — Kestrel</div>
+          <div class="node"><div class="ic ok">✓</div><div class="nrow"><div class="nm">skill_search<span>0.2s</span></div><div class="sub">"llm judge rubric"</div></div></div>
+          <div class="node"><div class="ic ok">✓</div><div class="nrow"><div class="nm">skill_read<span>0.1s</span></div><div class="sub">eval-harness</div></div></div>
+
+          <div class="grp-lbl">10:15 — Finch</div>
+          <div class="node"><div class="ic ok">✓</div><div class="nrow"><div class="nm">skill_write<span>0.3s</span></div><div class="sub">relevance-judge</div></div></div>
+          <div class="node"><div class="ic run">•</div><div class="nrow"><div class="nm">run_eval<span>running</span></div><div class="sub">sample n=200</div></div></div>
+        </div>
+      </div>
+
+      <!-- DOCS -->
+      <div class="docs" id="docs" style="display:none">
+        <div class="docs-h"><b>Documents</b><button onclick="toggleDocs()">×</button></div>
+        <div class="tabs"><div class="tab on">Docs</div><div class="tab">Skills</div></div>
+        <div class="srch">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg>
+          <input placeholder="Search">
+        </div>
+        <div class="dlist">
+          <div class="doc" onclick="openDoc()"><div class="fi"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M4 1h5l3 3v11H4z"/></svg></div><div><div class="dn">eval-protocol-v1.md</div><div class="dm">Kestrel · 10:16 · 4.8 KB</div></div></div>
+          <div class="doc" onclick="openDoc()"><div class="fi"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M4 1h5l3 3v11H4z"/></svg></div><div><div class="dn">prior-art-retrieval-eval.md</div><div class="dm">Wren · 10:07 · 2.1 KB</div></div></div>
+          <div class="doc" onclick="openDoc()"><div class="fi"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M4 1h5l3 3v11H4z"/></svg></div><div><div class="dn">corpus-stats.md</div><div class="dm">Kestrel · 09:41 · 1.3 KB</div></div></div>
+          <div class="doc" onclick="openDoc()"><div class="fi"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M4 1h5l3 3v11H4z"/></svg></div><div><div class="dn">open-questions.md</div><div class="dm">Finch · 09:20 · 0.8 KB</div></div></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="scrim" id="scrim" onclick="if(event.target===this)closeDoc()">
+  <div class="modal">
+    <div class="m-h">
+      <div>
+        <h2>eval-protocol-v1.md</h2>
+        <div class="meta">Kestrel · today 10:16 · v3</div>
+      </div>
+      <button class="x" onclick="closeDoc()">×</button>
+    </div>
+    <div class="m-b">
+      <div class="md">
+        <h1>Retrieval Evaluation Protocol</h1>
+        <p>Defines how we measure retrieval quality for the domain corpus. Supersedes the ad-hoc recall checks in <code>corpus-stats.md</code>.</p>
+        <h2>Metrics</h2>
+        <ul>
+          <li><b>recall@k</b> — k ∈ {1, 5, 10, 50}. Primary gate.</li>
+          <li><b>MRR</b> — sanity check on ranking.</li>
+          <li><b>nDCG@10</b> — graded relevance, 0–3 scale.</li>
+        </ul>
+        <blockquote>BEIR overstates performance on our corpus by ~11 pts. Do not report BEIR numbers without the domain caveat.</blockquote>
+        <h2>Labeling</h2>
+        <p>First pass uses LLM-as-judge via the <code>relevance-judge</code> skill. Human spot-check on a 10% stratified sample.</p>
+        <table>
+          <tr><th>Grade</th><th>Meaning</th><th>Example</th></tr>
+          <tr><td>3</td><td>Directly answers</td><td>Exact procedure</td></tr>
+          <tr><td>2</td><td>Strongly related</td><td>Adjacent section</td></tr>
+          <tr><td>1</td><td>Topical only</td><td>Same domain</td></tr>
+          <tr><td>0</td><td>Irrelevant</td><td>—</td></tr>
+        </table>
+        <h2>Harness</h2>
+        <pre><code>eval = Harness(
+  corpus="domain-v4",
+  queries="queries/gold-200.jsonl",
+  judge=skill("relevance-judge"),
+  metrics=["recall@k", "mrr", "ndcg@10"],
+)
+eval.run(sample=200, seed=7)</code></pre>
+        <h3>Acceptance</h3>
+        <p>Ship gate: <code>recall@10 ≥ 0.82</code> and <code>nDCG@10 ≥ 0.61</code> on the held-out split.</p>
+        <hr>
+        <p><a href="#">prior-art-retrieval-eval.md</a> · <a href="#">relevance-judge (skill)</a></p>
+      </div>
+    </div>
+    <div class="m-f">
+      <button class="mini">Edit</button>
+      <button class="mini">History</button>
+      <button class="mini">Copy</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const split=document.getElementById('split'),tl=document.getElementById('tl'),docs=document.getElementById('docs');
+document.getElementById('tlBtn').onclick=function(){
+  const off=tl.style.display==='none';
+  tl.style.display=off?'flex':'none';this.classList.toggle('on',off);
+  split.classList.toggle('no-tl',!off);
+};
+function toggleDocs(){
+  const off=docs.style.display==='none';
+  docs.style.display=off?'flex':'none';
+  document.getElementById('docBtn').classList.toggle('on',off);
+  split.classList.toggle('docs-open',off);
+}
+document.getElementById('docBtn').onclick=toggleDocs;
+function openDoc(){document.getElementById('scrim').classList.add('on')}
+function closeDoc(){document.getElementById('scrim').classList.remove('on')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDoc()});
+document.querySelectorAll('.thread').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.thread').forEach(x=>x.classList.remove('on'));t.classList.add('on');
+});
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');
+});
+</script>
+</body>
+</html>
