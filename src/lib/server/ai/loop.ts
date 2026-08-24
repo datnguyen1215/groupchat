@@ -6,6 +6,10 @@ import { MAX_STEPS, chatModel, noThinking } from './model';
 import { orchestratorPrompt, workerPrompt } from './prompts';
 import { orchestratorTools, workerTools, type ToolContext } from './tools';
 import { appendActivity, appendMessage, appendStep, listEntries, setAgentStatus } from '../repo';
+import { logger, since } from '../logger';
+import { detailOf } from './detail';
+
+const log = logger('agent');
 
 /** Tool calls that are the agent talking, not the agent working. */
 export const SPEECH = new Set(['send_chat_message', 'finish']);
@@ -24,11 +28,11 @@ export const barsFor = (
  * tool runs the model already knows about, and feeding them back reads as noise.
  */
 const transcript = async (threadId: string) => {
-	const entries = await listEntries(threadId);
-	return entries
-		.filter((e) => e.kind === 'message')
-		.map((e) => `${e.author}: ${e.paragraphs.join('\n')}`)
-		.join('\n\n');
+  const entries = await listEntries(threadId);
+  return entries
+    .filter(e => e.kind === 'message')
+    .map(e => `${e.author}: ${e.paragraphs.join('\n')}`)
+    .join('\n\n');
 };
 
 /**
@@ -37,44 +41,34 @@ const transcript = async (threadId: string) => {
  * message entry, and showing it again as a tool call would double it up.
  */
 const recordSteps = async (
-	threadId: string,
-	label: string,
-	steps: { toolCalls?: { toolName: string; input: unknown }[] }[]
+  threadId: string,
+  label: string,
+  steps: { toolCalls?: { toolName: string; input: unknown }[] }[]
 ) => {
-	const bars = barsFor(steps);
-	if (!bars.length) return;
+  const bars = barsFor(steps);
+  if (!bars.length) return;
 
-	const working = steps
-		.flatMap((step) => step.toolCalls ?? [])
-		.filter((call) => !SPEECH.has(call.toolName));
+  const working = steps
+    .flatMap(step => step.toolCalls ?? [])
+    .filter(call => !SPEECH.has(call.toolName));
 
-	for (const [i, call] of working.entries())
-		await appendStep({
-			threadId,
-			groupLabel: label,
-			state: bars[i],
-			name: call.toolName,
-			detail: detailOf(call.input),
-			durationMs: null,
-			badge: bars[i] === 'spawn' ? 'agent' : undefined
-		});
+  for (const [i, call] of working.entries())
+    await appendStep({
+      threadId,
+      groupLabel: label,
+      state: bars[i],
+      name: call.toolName,
+      detail: detailOf(call.input),
+      durationMs: null,
+      badge: bars[i] === 'spawn' ? 'agent' : undefined
+    });
 
-	await appendActivity({ threadId, label: `${label} · ${bars.length} tools`, bars });
-};
-
-/** A one-line summary of a tool's input, for the drawer's detail column. */
-export const detailOf = (input: unknown) => {
-	if (!input || typeof input !== 'object') return '';
-	const values = Object.values(input as Record<string, unknown>)
-		.filter((v) => typeof v === 'string')
-		.map((v) => v as string);
-	const first = values[0] ?? '';
-	return first.length > 80 ? `${first.slice(0, 77)}...` : first;
+  await appendActivity({ threadId, label: `${label} · ${bars.length} tools`, bars });
 };
 
 const agentRow = async (id: string) => {
-	const [row] = await db.select().from(agents).where(eq(agents.id, id));
-	return row ?? null;
+  const [row] = await db.select().from(agents).where(eq(agents.id, id));
+  return row ?? null;
 };
 
 /**
@@ -82,37 +76,58 @@ const agentRow = async (id: string) => {
  * then returns its report to whoever delegated the work.
  */
 const runWorker = async (threadId: string, agentId: string, task: string) => {
-	const agent = await agentRow(agentId);
-	if (!agent) return `No agent with id "${agentId}".`;
+  const agent = await agentRow(agentId);
+  if (!agent) {
+    log.warn({ agentId, threadId }, 'worker not found');
+    return `No agent with id "${agentId}".`;
+  }
 
-	await setAgentStatus(agentId, 'busy', 'Working', threadId);
+  await setAgentStatus(agentId, 'busy', 'Working', threadId);
+  const start = Date.now();
+  log.info({ agentId, agentName: agent.name, threadId, task }, 'worker start');
 
-	try {
-		const ctx: ToolContext = { threadId, agentId, tag: agent.role || 'agent' };
-		const result = await generateText({
-			model: chatModel,
-			providerOptions: noThinking,
-			system: workerPrompt(agent.name, agent.role, agent.description),
-			prompt: `Here is the conversation so far:\n\n${await transcript(threadId)}\n\nYour task: ${task}`,
-			tools: workerTools(ctx),
-			stopWhen: stepCountIs(MAX_STEPS)
-		});
+  try {
+    const ctx: ToolContext = { threadId, agentId, tag: agent.role || 'agent' };
+    const result = await generateText({
+      model: chatModel,
+      providerOptions: noThinking,
+      system: workerPrompt(agent.name, agent.role, agent.description),
+      prompt: `Here is the conversation so far:\n\n${await transcript(threadId)}\n\nYour task: ${task}`,
+      tools: workerTools(ctx),
+      stopWhen: stepCountIs(MAX_STEPS)
+    });
 
-		await recordSteps(threadId, agent.name, result.steps);
+    await recordSteps(threadId, agent.name, result.steps);
+    log.info(
+      {
+        agentId,
+        agentName: agent.name,
+        threadId,
+        steps: result.steps.length,
+        tools: result.steps.flatMap(s => s.toolCalls ?? []).map(c => c.toolName),
+        finish: result.finishReason,
+        tokens: result.usage?.totalTokens,
+        ms: since(start)
+      },
+      'worker done'
+    );
 
-		/** `finish` leaves no text, so the last thing said in chat is the report. */
-		return result.text.trim() || `${agent.name} finished the task.`;
-	} catch (error) {
-		/**
-		 * Handed back as the report rather than rethrown: the orchestrator asked
-		 * this agent for an answer, and "I failed" is an answer it can act on.
-		 */
-		console.error(`[agent loop] ${agent.name}`, error);
-		return `${agent.name} could not finish — ${describe(error)}.`;
-	} finally {
-		/** Always. A stuck `busy` row is a presence indicator that never clears. */
-		await setAgentStatus(agentId, 'idle', 'Idle');
-	}
+    /** `finish` leaves no text, so the last thing said in chat is the report. */
+    return result.text.trim() || `${agent.name} finished the task.`;
+  } catch (error) {
+    /**
+     * Handed back as the report rather than rethrown: the orchestrator asked
+     * this agent for an answer, and "I failed" is an answer it can act on.
+     */
+    log.error(
+      { agentId, agentName: agent.name, threadId, ms: since(start), err: error },
+      'worker failed'
+    );
+    return `${agent.name} could not finish — ${describe(error)}.`;
+  } finally {
+    /** Always. A stuck `busy` row is a presence indicator that never clears. */
+    await setAgentStatus(agentId, 'idle', 'Idle');
+  }
 };
 
 /**
@@ -121,39 +136,56 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
  * next refresh.
  */
 export const runOrchestrator = async (threadId: string) => {
-	const [orch] = await db.select().from(agents).where(eq(agents.kind, 'orchestrator'));
-	if (!orch) return;
+  const [orch] = await db.select().from(agents).where(eq(agents.kind, 'orchestrator'));
+  if (!orch) {
+    log.error({ threadId }, 'no orchestrator agent — turn skipped');
+    return;
+  }
 
-	await setAgentStatus(orch.id, 'busy', 'Thinking', threadId);
+  await setAgentStatus(orch.id, 'busy', 'Thinking', threadId);
+  const start = Date.now();
+  log.info({ agentId: orch.id, agentName: orch.name, threadId }, 'turn start');
 
-	try {
-		const ctx: ToolContext = { threadId, agentId: orch.id, tag: 'orch' };
-		const result = await generateText({
-			model: chatModel,
-			providerOptions: noThinking,
-			system: orchestratorPrompt(orch.name),
-			prompt: `Here is the conversation so far:\n\n${await transcript(threadId)}\n\nDecide what happens next.`,
-			tools: orchestratorTools(ctx, (agentId, task) => runWorker(threadId, agentId, task)),
-			stopWhen: stepCountIs(MAX_STEPS)
-		});
+  try {
+    const ctx: ToolContext = { threadId, agentId: orch.id, tag: 'orch' };
+    const result = await generateText({
+      model: chatModel,
+      providerOptions: noThinking,
+      system: orchestratorPrompt(orch.name),
+      prompt: `Here is the conversation so far:\n\n${await transcript(threadId)}\n\nDecide what happens next.`,
+      tools: orchestratorTools(ctx, (agentId, task) => runWorker(threadId, agentId, task)),
+      stopWhen: stepCountIs(MAX_STEPS)
+    });
 
-		await recordSteps(threadId, orch.name, result.steps);
-	} catch (error) {
-		/**
-		 * The turn is over and nobody is coming. Saying so in the thread is the
-		 * only way the failure reaches the person who is waiting on a reply —
-		 * there is no streaming channel to report it on.
-		 */
-		console.error('[agent loop]', error);
-		await appendMessage({
-			threadId,
-			authorId: orch.id,
-			tag: 'orch',
-			paragraphs: [`I could not run this turn — ${describe(error)}. Nothing was lost; try again.`]
-		});
-	} finally {
-		await setAgentStatus(orch.id, 'idle', 'Idle');
-	}
+    await recordSteps(threadId, orch.name, result.steps);
+    log.info(
+      {
+        agentId: orch.id,
+        threadId,
+        steps: result.steps.length,
+        tools: result.steps.flatMap(s => s.toolCalls ?? []).map(c => c.toolName),
+        finish: result.finishReason,
+        tokens: result.usage?.totalTokens,
+        ms: since(start)
+      },
+      'turn done'
+    );
+  } catch (error) {
+    /**
+     * The turn is over and nobody is coming. Saying so in the thread is the
+     * only way the failure reaches the person who is waiting on a reply —
+     * there is no streaming channel to report it on.
+     */
+    log.error({ agentId: orch.id, threadId, ms: since(start), err: error }, 'turn failed');
+    await appendMessage({
+      threadId,
+      authorId: orch.id,
+      tag: 'orch',
+      paragraphs: [`I could not run this turn — ${describe(error)}. Nothing was lost; try again.`]
+    });
+  } finally {
+    await setAgentStatus(orch.id, 'idle', 'Idle');
+  }
 };
 
 /**
@@ -165,21 +197,21 @@ export const runOrchestrator = async (threadId: string) => {
  * status code picks from fixed wording, and the real error goes to the log.
  */
 export const describe = (error: unknown) => {
-	const status = statusOf(error);
+  const status = statusOf(error);
 
-	if (status === 401 || status === 403) return 'the model provider rejected our credentials';
-	if (status === 429) return 'the model provider is rate limiting us';
-	if (status === 408 || status === 504) return 'the model provider timed out';
-	if (status && status >= 500) return 'the model provider is having trouble';
-	if (status && status >= 400) return 'the model provider rejected the request';
+  if (status === 401 || status === 403) return 'the model provider rejected our credentials';
+  if (status === 429) return 'the model provider is rate limiting us';
+  if (status === 408 || status === 504) return 'the model provider timed out';
+  if (status && status >= 500) return 'the model provider is having trouble';
+  if (status && status >= 400) return 'the model provider rejected the request';
 
-	return 'something went wrong on our side';
+  return 'something went wrong on our side';
 };
 
 const statusOf = (error: unknown) => {
-	if (!error || typeof error !== 'object') return null;
-	const status = (error as { statusCode?: unknown }).statusCode;
-	return typeof status === 'number' ? status : null;
+  if (!error || typeof error !== 'object') return null;
+  const status = (error as { statusCode?: unknown }).statusCode;
+  return typeof status === 'number' ? status : null;
 };
 
 /**
@@ -188,7 +220,8 @@ const statusOf = (error: unknown) => {
  * crash here must not take the request down with it.
  */
 export const startTurn = (threadId: string) => {
-	void runOrchestrator(threadId).catch((error) => {
-		console.error('[agent loop]', error);
-	});
+  log.info({ threadId }, 'turn queued');
+  void runOrchestrator(threadId).catch(error => {
+    log.error({ threadId, err: error }, 'detached turn crashed');
+  });
 };
