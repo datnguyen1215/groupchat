@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import favicon from '$lib/assets/favicon.svg';
+  import Logo from './Logo.svelte';
 
   type Props = { title: string; lead: string; error?: string; children: Snippet };
   const { title, lead, error, children }: Props = $props();
@@ -9,7 +9,7 @@
 <div class="grid h-screen place-items-center bg-bg px-5">
   <div class="w-[300px] rounded-[14px] border border-line bg-panel p-[22px]">
     <div class="mb-4 flex items-center gap-2">
-      <img src={favicon} alt="" class="h-5 w-5 rounded-[6px]" />
+      <Logo size={20} />
       <b class="text-[13px] font-semibold tracking-[-0.01em]">groupchat</b>
     </div>
 

@@ -27,6 +27,16 @@
 - Single node. No plan for more than one. Do not add Redis or `LISTEN/NOTIFY`.
 - Every write in `repo.ts` publishes. Add a write? Publish from it.
 
+## Logging
+
+- Server: `pino`, via `src/lib/server/logger.ts`. Browser: `src/lib/logger.svelte.ts`. Same call shape.
+- Get one with `logger('area')`. Components use `trace('Name')` — it logs mount/unmount itself.
+- `error` failed. `warn` recovered. `info` is what happened. `debug` is high-volume detail.
+- Default to `info`. Reach for `debug` only when a line fires per-event, per-tab or per-heartbeat.
+- Every write in `repo.ts` logs. Reads do not — the request line covers them.
+- Never log a field called `name`; pino reserves it. Use `threadName`, `agentName`.
+- Turn on the noisy lines with `LOG_LEVEL=debug`, or `localStorage.LOG_LEVEL = 'debug'` in the browser.
+
 ## Ports
 
 - Every service in this project runs on a port in the **10200+** range.

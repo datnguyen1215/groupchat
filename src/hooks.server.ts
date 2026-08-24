@@ -1,12 +1,38 @@
-import { error, redirect, type Handle } from '@sveltejs/kit';
+import { error, redirect, type Handle, type HandleServerError } from '@sveltejs/kit';
+import { sequence } from '@sveltejs/kit/hooks';
 import { building } from '$app/environment';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { auth } from '$lib/server/auth';
+import { logger, since } from '$lib/server/logger';
+
+const log = logger('http');
+
+/**
+ * One line per request, after the response is known, so method, path, status
+ * and duration land together. This is the spine of a trace: everything a
+ * request did is logged between its start and this line.
+ */
+const logRequests: Handle = async ({ event, resolve }) => {
+  const start = Date.now();
+  const { method } = event.request;
+  const path = event.url.pathname;
+
+  log.debug({ method, path }, 'request start');
+
+  const response = await resolve(event);
+  const ms = since(start);
+
+  /** A 5xx is ours; a 4xx is the caller's. Neither is a silent success. */
+  const level = response.status >= 500 ? 'error' : response.status >= 400 ? 'warn' : 'info';
+  log[level]({ method, path, status: response.status, ms }, 'request');
+
+  return response;
+};
 
 /** Reachable signed out. Everything else needs a session. */
 const PUBLIC_ROUTES = new Set(['/login', '/signup']);
 
-export const handle: Handle = async ({ event, resolve }) => {
+const authenticate: Handle = async ({ event, resolve }) => {
   const session = await auth.api.getSession({ headers: event.request.headers });
   event.locals.user = session?.user ?? null;
   event.locals.session = session?.session ?? null;
@@ -31,4 +57,16 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   return svelteKitHandler({ auth, event, resolve, building });
+};
+
+/** Logging wraps auth so a redirect or a 401 is still one logged request. */
+export const handle = sequence(logRequests, authenticate);
+
+/** Uncaught server errors. SvelteKit already returned a 500 by the time this runs. */
+export const handleError: HandleServerError = ({ error, event }) => {
+  log.error(
+    { path: event.url.pathname, method: event.request.method, err: error },
+    'unhandled server error'
+  );
+  return { message: 'Internal error' };
 };

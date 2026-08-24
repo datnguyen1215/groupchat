@@ -8,12 +8,9 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('$env/dynamic/private', () => ({ env: { DEEPSEEK_API_KEY: 'test' } }));
 vi.mock('../../src/lib/server/db', () => ({ db: {}, schema: {} }));
 
-const {
-  SPEECH,
-  barsFor,
-  detailOf,
-  describe: errorLine
-} = await import('../../src/lib/server/ai/loop');
+const { SPEECH, barsFor, describe: errorLine } = await import('../../src/lib/server/ai/loop');
+
+const { detailOf } = await import('../../src/lib/server/ai/detail');
 
 const call = (toolName: string) => ({ toolName });
 

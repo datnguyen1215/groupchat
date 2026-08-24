@@ -1,6 +1,9 @@
 import type { RequestHandler } from './$types';
 import { subscribe } from '$lib/server/events/bus';
 import { keyOf } from '$lib/server/events/types';
+import { logger, since } from '$lib/server/logger';
+
+const log = logger('sse');
 
 /** Below any proxy's idle timeout, so an quiet connection is never cut as dead. */
 const HEARTBEAT_MS = 25_000;
@@ -13,6 +16,7 @@ const HEARTBEAT_MS = 25_000;
  */
 export const GET: RequestHandler = ({ request }) => {
   const encoder = new TextEncoder();
+  const openedAt = Date.now();
 
   const stream = new ReadableStream({
     start(controller) {
@@ -28,16 +32,25 @@ export const GET: RequestHandler = ({ request }) => {
         }
       };
 
-      const unsubscribe = subscribe(event => send(`data: ${keyOf(event)}\n\n`));
+      const unsubscribe = subscribe(event => {
+        const key = keyOf(event);
+        /** Debug: one line per event per client, so it scales with both. */
+        log.debug({ key }, 'event sent');
+        send(`data: ${key}\n\n`);
+      });
 
       /** Comment frames: ignored by EventSource, enough to hold the socket open. */
-      const heartbeat = setInterval(() => send(': ping\n\n'), HEARTBEAT_MS);
+      const heartbeat = setInterval(() => {
+        log.debug('heartbeat');
+        send(': ping\n\n');
+      }, HEARTBEAT_MS);
 
       function close() {
         if (!open) return;
         open = false;
         clearInterval(heartbeat);
         unsubscribe();
+        log.info({ ms: since(openedAt) }, 'stream closed');
         try {
           controller.close();
         } catch {
@@ -49,6 +62,7 @@ export const GET: RequestHandler = ({ request }) => {
 
       /** Flush headers, so the browser fires `onopen` before the first event. */
       send(': connected\n\n');
+      log.info('stream opened');
     }
   });
 

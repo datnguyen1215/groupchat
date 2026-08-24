@@ -3,8 +3,11 @@
   import Rail from '$lib/components/Rail.svelte';
   import SkillModal from '$lib/components/SkillModal.svelte';
   import { live } from '$lib/state/live.svelte';
+  import { trace } from '$lib/logger.svelte';
 
   const { children } = $props();
+
+  trace('Layout');
 
   /* One stream for the whole app. Every page's data invalidates off it. */
   $effect(() => live.connect());

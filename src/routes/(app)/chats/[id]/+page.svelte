@@ -5,8 +5,11 @@
   import DocsSidebar from '$lib/components/DocsSidebar.svelte';
   import ThreadList from '$lib/components/ThreadList.svelte';
   import { invalidateAll } from '$app/navigation';
+  import { trace } from '$lib/logger.svelte';
 
   const { data } = $props();
+
+  const log = trace('ChatPage');
 
   const thread = $derived(data.thread);
   const steps = $derived(data.activity.reduce((n, g) => n + g.steps.length, 0));
@@ -25,6 +28,7 @@
   };
 
   const startRename = () => {
+    log.info({ threadId: thread.id, name: thread.name }, 'rename started');
     draft = thread.name;
     renaming = true;
   };
@@ -32,18 +36,26 @@
   const commit = async () => {
     const name = draft.trim();
     renaming = false;
-    if (!name || name === thread.name) return;
-    await fetch(`/api/threads/${thread.id}`, {
+    if (!name || name === thread.name) {
+      log.info({ threadId: thread.id }, 'rename cancelled — unchanged');
+      return;
+    }
+
+    const response = await fetch(`/api/threads/${thread.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name })
     });
+
+    if (response.ok) log.info({ threadId: thread.id, name }, 'renamed');
+    else log.error({ threadId: thread.id, name, status: response.status }, 'rename failed');
+
     await invalidateAll();
   };
 
   /* Panels are per-thread affordances; collapse them when the thread changes. */
   $effect(() => {
-    thread.id;
+    log.info({ threadId: thread.id, name: thread.name }, 'thread opened');
     activityOpen = false;
     docsOpen = false;
     renaming = false;
@@ -82,7 +94,10 @@
       class="rounded-[7px] border border-line px-[11px] py-[5px] text-[12.5px] text-ink-2 hover:border-ink-3 hover:text-ink"
       class:bg-panel-2={activityOpen}
       class:text-ink={activityOpen}
-      onclick={() => (activityOpen = !activityOpen)}
+      onclick={() => {
+        activityOpen = !activityOpen;
+        log.info({ threadId: thread.id, open: activityOpen }, 'activity toggled');
+      }}
     >
       Activity · {steps}
     </button>
@@ -90,7 +105,10 @@
       class="rounded-[7px] border border-line px-[11px] py-[5px] text-[12.5px] text-ink-2 hover:border-ink-3 hover:text-ink"
       class:bg-panel-2={docsOpen}
       class:text-ink={docsOpen}
-      onclick={() => (docsOpen = !docsOpen)}
+      onclick={() => {
+        docsOpen = !docsOpen;
+        log.info({ threadId: thread.id, open: docsOpen }, 'documents toggled');
+      }}
     >
       Documents
     </button>

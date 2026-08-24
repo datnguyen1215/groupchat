@@ -1,4 +1,7 @@
 import type { LiveEvent } from './types';
+import { logger } from '../logger';
+
+const log = logger('bus');
 
 /**
  * The swappable half of the live layer. Everything upstream calls `publish`,
@@ -16,11 +19,14 @@ const listeners = new Set<Listener>();
 
 /** Announces a change. Never throws: a broken subscriber must not fail a write. */
 export const publish = (event: LiveEvent) => {
+  /** Debug: one line per write, and writes are the busiest thing here. */
+  log.debug({ ...event, listeners: listeners.size }, 'publish');
+
   for (const listener of listeners) {
     try {
       listener(event);
     } catch (error) {
-      console.error('[live bus]', error);
+      log.error({ ...event, err: error }, 'subscriber threw');
     }
   }
 };
@@ -28,5 +34,9 @@ export const publish = (event: LiveEvent) => {
 /** Registers a listener. The returned function removes it — always call it. */
 export const subscribe = (listener: Listener) => {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  log.info({ listeners: listeners.size }, 'subscribed');
+  return () => {
+    listeners.delete(listener);
+    log.info({ listeners: listeners.size }, 'unsubscribed');
+  };
 };

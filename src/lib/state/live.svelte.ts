@@ -1,5 +1,8 @@
 import { invalidate } from '$app/navigation';
 import { browser } from '$app/environment';
+import { logger } from '$lib/logger.svelte';
+
+const log = logger('live');
 
 /**
  * The client half of the live layer, and the only place that knows the
@@ -29,6 +32,7 @@ class Live {
   connect() {
     if (!browser || this.#source) return () => {};
 
+    log.info('connecting');
     const source = new EventSource('/api/events');
     this.#source = source;
 
@@ -42,18 +46,26 @@ class Live {
       const reopened = this.#everOpen;
       this.#everOpen = true;
       this.connected = true;
+      log.info({ reopened }, reopened ? 'reconnected — refetching everything' : 'connected');
       if (reopened) void invalidate(() => true);
     };
 
     /** The payload is the invalidate key itself — see `events/types.ts`. */
-    source.onmessage = event => void invalidate(event.data);
+    source.onmessage = event => {
+      /** Debug: one line per event per tab, the busiest thing on the client. */
+      log.debug({ key: event.data }, 'event');
+      void invalidate(event.data);
+    };
 
     /** EventSource retries on its own; this only reflects the gap in the UI. */
     source.onerror = () => {
+      /** Warn, not error: EventSource retries, so the stream usually comes back. */
+      if (this.connected) log.warn('stream dropped — EventSource will retry');
       this.connected = false;
     };
 
     return () => {
+      log.info('disconnecting');
       source.close();
       this.#source = null;
       this.#everOpen = false;
