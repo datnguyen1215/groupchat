@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { connect } from '../../support/db';
+import { SEED_THREADS } from '../../../src/lib/server/db/seed-ids';
 
 /**
  * The append-only guarantee, checked against the real database.
@@ -86,13 +87,15 @@ test.describe('presence is separate from the message stream', () => {
   test('marking an agent busy adds no entry to the thread', async () => {
     const sql = connect();
     try {
-      const before = await sql`select count(*)::int as n from entries where thread_id = 'retrieval-eval'`;
+      const before =
+        await sql`select count(*)::int as n from entries where thread_id = ${SEED_THREADS.retrievalEval}`;
 
       await sql`
         update agents set status = 'busy', status_label = 'Working',
-          busy_thread_id = 'retrieval-eval' where id = 'wren'
+          busy_thread_id = ${SEED_THREADS.retrievalEval} where id = 'wren'
       `;
-      const after = await sql`select count(*)::int as n from entries where thread_id = 'retrieval-eval'`;
+      const after =
+        await sql`select count(*)::int as n from entries where thread_id = ${SEED_THREADS.retrievalEval}`;
 
       expect(after[0].n).toBe(before[0].n);
 
@@ -137,12 +140,12 @@ test.describe('a failed turn does not strand the agent', () => {
       await sql`
         update agents
         set status = 'busy', status_label = 'Thinking',
-            busy_thread_id = 'retrieval-eval',
+            busy_thread_id = ${SEED_THREADS.retrievalEval},
             updated_at = now() - interval '30 minutes'
         where id = ${AGENT}
       `;
 
-      await page.goto('/chats/retrieval-eval');
+      await page.goto(`/chats/${SEED_THREADS.retrievalEval}`);
 
       const [row] = await sql`select status, busy_thread_id from agents where id = ${AGENT}`;
       expect(row.status).toBe('idle');
@@ -158,11 +161,11 @@ test.describe('a failed turn does not strand the agent', () => {
       await sql`
         update agents
         set status = 'busy', status_label = 'Thinking',
-            busy_thread_id = 'retrieval-eval', updated_at = now()
+            busy_thread_id = ${SEED_THREADS.retrievalEval}, updated_at = now()
         where id = ${AGENT}
       `;
 
-      await page.goto('/chats/retrieval-eval');
+      await page.goto(`/chats/${SEED_THREADS.retrievalEval}`);
 
       const [row] = await sql`select status from agents where id = ${AGENT}`;
       expect(row.status).toBe('busy');

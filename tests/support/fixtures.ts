@@ -1,4 +1,9 @@
 import type { Sql } from 'postgres';
+import { SEED_THREADS } from '../../src/lib/server/db/seed-ids';
+
+/** Thread ids are UUIDs; these aliases keep the fixtures readable. */
+const RETRIEVAL_EVAL = SEED_THREADS.retrievalEval;
+const ABLATION_CONTEXT = SEED_THREADS.ablationContext;
 
 /**
  * A small, fixed baseline every test can read. Tests that mutate create their
@@ -30,8 +35,8 @@ export const BASE = {
     { id: 'you', name: 'You', initials: 'DN', color: '#5b5b66', kind: 'you' }
   ],
   threads: [
-    { id: 'retrieval-eval', name: 'Retrieval eval design' },
-    { id: 'ablation-context', name: 'Ablation: context window' }
+    { id: RETRIEVAL_EVAL, name: 'Retrieval eval design' },
+    { id: ABLATION_CONTEXT, name: 'Ablation: context window' }
   ],
   skills: [
     {
@@ -60,7 +65,7 @@ export const BASE = {
       /* Id matches the fixture thread's `docIds`, so the chat docs lane resolves it. */
       id: 'eval-protocol-v1',
       name: 'eval-protocol-v1.md',
-      threadId: 'retrieval-eval',
+      threadId: RETRIEVAL_EVAL,
       authorId: 'kestrel',
       version: 1,
       /* Heading, table and code fence: the modal must render each as a real element. */
@@ -84,8 +89,8 @@ export const BASE = {
   /** One message carrying a document, so the chat's doc-chip has something to open. */
   entries: [
     {
-      id: 'retrieval-eval-e1',
-      threadId: 'retrieval-eval',
+      id: '33333333-3333-4333-8333-333333333333',
+      threadId: RETRIEVAL_EVAL,
       seq: 1,
       authorId: 'kestrel',
       paragraphs: ['Protocol is written up.'],

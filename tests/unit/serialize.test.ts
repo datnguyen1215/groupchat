@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { documentDto, skillDto } from '../../src/lib/server/serialize';
+import { SEED_THREADS } from '../../src/lib/server/db/seed-ids';
 
 /**
  * These guard the compatibility contract: the DB dropped the fixtures'
@@ -57,7 +58,7 @@ describe('skillDto', () => {
 const docRow = {
   id: 'eval-protocol',
   name: 'eval-protocol.md',
-  threadId: 'retrieval-eval',
+  threadId: SEED_THREADS.retrievalEval,
   version: 2,
   body: 'x'.repeat(1536),
   updatedAt: now,

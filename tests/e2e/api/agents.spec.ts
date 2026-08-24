@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
+import { SEED_THREADS } from '../../../src/lib/server/db/seed-ids';
 
 const unique = (label: string) => `${label} ${test.info().parallelIndex} ${Date.now()}`;
 
@@ -131,7 +132,11 @@ test.describe('DELETE /api/agents/:id', () => {
   test('refuses with 409 when the agent still authors a document', async ({ request }) => {
     const agent = await create(request);
     await request.post('/api/documents', {
-      data: { name: `held-${Date.now()}.md`, threadId: 'retrieval-eval', authorId: agent.id }
+      data: {
+        name: `held-${Date.now()}.md`,
+        threadId: SEED_THREADS.retrievalEval,
+        authorId: agent.id
+      }
     });
 
     const res = await request.delete(`/api/agents/${agent.id}`);

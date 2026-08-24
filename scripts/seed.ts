@@ -13,6 +13,8 @@ import { sql } from 'drizzle-orm';
 import * as s from '../src/lib/server/db/schema';
 import { databaseUrl } from '../src/lib/server/db/url';
 
+import { SEED_THREADS } from '../src/lib/server/db/seed-ids';
+
 const client = postgres(databaseUrl(process.env.DATABASE_URL));
 const db = drizzle(client, { schema: s });
 
@@ -35,7 +37,7 @@ const agents = [
     kind: 'research' as const,
     role: 'analyst',
     description:
-      "You design measurements and read results honestly. You push back when a number cannot support the claim being made."
+      'You design measurements and read results honestly. You push back when a number cannot support the claim being made.'
   },
   {
     id: 'wren',
@@ -100,13 +102,29 @@ const main = async () => {
     sql`truncate table ${s.steps}, ${s.entries}, ${s.agentSkills}, ${s.documents}, ${s.skills}, ${s.threads}, ${s.agents} restart identity cascade`
   );
 
-  await db.insert(s.agents).values(
-    agents.map(a => ({ ...a, status: 'idle' as const, statusLabel: 'Idle', instances: 1 }))
-  );
+  await db
+    .insert(s.agents)
+    .values(
+      agents.map(a => ({ ...a, status: 'idle' as const, statusLabel: 'Idle', instances: 1 }))
+    );
 
+  /**
+   * Thread ids are UUIDs in production. The seed pins two fixed ones so the
+   * e2e suite can address a known thread without querying for it first.
+   */
   await db.insert(s.threads).values([
-    { id: 'retrieval-eval', name: 'Retrieval eval design', group: 'Active' as const, live: true },
-    { id: 'ablation-context', name: 'Ablation: context window', group: 'Active' as const, live: false }
+    {
+      id: SEED_THREADS.retrievalEval,
+      name: 'Retrieval eval design',
+      group: 'Active' as const,
+      live: true
+    },
+    {
+      id: SEED_THREADS.ablationContext,
+      name: 'Ablation: context window',
+      group: 'Active' as const,
+      live: false
+    }
   ]);
 
   await db.insert(s.skills).values(skills);

@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { dialog, ready } from '../../support/ui';
+import { SEED_THREADS } from '../../../src/lib/server/db/seed-ids';
 
 test.describe('documents page', () => {
   test.beforeEach(async ({ page }) => await ready(page, '/documents'));
@@ -44,7 +45,7 @@ test.describe('documents page', () => {
 
 test.describe('thread documents', () => {
   /* Named explicitly: `/` redirects to whichever thread is most recent. */
-  test.beforeEach(async ({ page }) => await ready(page, '/chats/retrieval-eval'));
+  test.beforeEach(async ({ page }) => await ready(page, `/chats/${SEED_THREADS.retrievalEval}`));
 
   test('the chat sidebar opens from the header and is scoped to the thread', async ({ page }) => {
     /* The docs lane is optional and closed by default, matching the calm shell. */

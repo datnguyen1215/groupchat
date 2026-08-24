@@ -49,7 +49,9 @@ describe('barsFor', () => {
   });
 
   it('agrees with SPEECH about what counts as talking', () => {
-    expect([...SPEECH].every(name => barsFor([{ toolCalls: [call(name)] }]).length === 0)).toBe(true);
+    expect([...SPEECH].every(name => barsFor([{ toolCalls: [call(name)] }]).length === 0)).toBe(
+      true
+    );
   });
 });
 
@@ -89,9 +91,7 @@ describe('describe', () => {
     expect(errorLine(providerError(429, 'anything'))).toBe(
       'the model provider is rate limiting us'
     );
-    expect(errorLine(providerError(503, 'anything'))).toBe(
-      'the model provider is having trouble'
-    );
+    expect(errorLine(providerError(503, 'anything'))).toBe('the model provider is having trouble');
   });
 
   /**
@@ -99,10 +99,7 @@ describe('describe', () => {
    * quotes part of the API key, and this string is stored as a chat message.
    */
   it('never leaks the provider message, key fragments included', () => {
-    const leaky = providerError(
-      401,
-      'Authentication Fails, Your api key: ****316c is invalid'
-    );
+    const leaky = providerError(401, 'Authentication Fails, Your api key: ****316c is invalid');
     const line = errorLine(leaky);
 
     expect(line).not.toContain('316c');
@@ -119,11 +116,7 @@ describe('describe', () => {
   });
 
   it('groups unrecognised 4xx and 5xx rather than passing them through', () => {
-    expect(errorLine(providerError(418, 'teapot'))).toBe(
-      'the model provider rejected the request'
-    );
-    expect(errorLine(providerError(599, 'unknown'))).toBe(
-      'the model provider is having trouble'
-    );
+    expect(errorLine(providerError(418, 'teapot'))).toBe('the model provider rejected the request');
+    expect(errorLine(providerError(599, 'unknown'))).toBe('the model provider is having trouble');
   });
 });

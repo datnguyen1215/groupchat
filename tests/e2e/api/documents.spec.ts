@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
+import { SEED_THREADS } from '../../../src/lib/server/db/seed-ids';
 
 const unique = (label: string) => `${label}-${test.info().parallelIndex}-${Date.now()}.md`;
 
@@ -7,7 +8,7 @@ const create = async (request: APIRequestContext, overrides: Record<string, unkn
   const res = await request.post('/api/documents', {
     data: {
       name: unique('doc'),
-      threadId: 'retrieval-eval',
+      threadId: SEED_THREADS.retrievalEval,
       authorId: 'kestrel',
       body: '# Doc\n\nbody',
       ...overrides
@@ -39,16 +40,16 @@ test.describe('GET /api/documents', () => {
 
   test('filters by threadId', async ({ request }) => {
     const { documents } = await (
-      await request.get('/api/documents?threadId=retrieval-eval')
+      await request.get(`/api/documents?threadId=${SEED_THREADS.retrievalEval}`)
     ).json();
     expect(documents.length).toBeGreaterThan(0);
-    expect(documents.every((d: { threadId: string }) => d.threadId === 'retrieval-eval')).toBe(
-      true
-    );
+    expect(
+      documents.every((d: { threadId: string }) => d.threadId === SEED_THREADS.retrievalEval)
+    ).toBe(true);
   });
 
   test('returns an empty list for a thread with no documents', async ({ request }) => {
-    const res = await request.get('/api/documents?threadId=ablation-context');
+    const res = await request.get(`/api/documents?threadId=${SEED_THREADS.ablationContext}`);
     expect(res.status()).toBe(200);
     expect((await res.json()).documents).toEqual([]);
   });
@@ -57,7 +58,11 @@ test.describe('GET /api/documents', () => {
 test.describe('POST /api/documents', () => {
   test('creates at version 1', async ({ request }) => {
     const doc = await create(request);
-    expect(doc).toMatchObject({ version: 'v1', author: 'Kestrel', threadId: 'retrieval-eval' });
+    expect(doc).toMatchObject({
+      version: 'v1',
+      author: 'Kestrel',
+      threadId: SEED_THREADS.retrievalEval
+    });
   });
 
   test('reports an unknown thread and author together', async ({ request }) => {
@@ -98,7 +103,9 @@ test.describe('PATCH /api/documents/:id', () => {
   test('moves a document between threads without bumping the version', async ({ request }) => {
     const doc = await create(request);
     const { document } = await (
-      await request.patch(`/api/documents/${doc.id}`, { data: { threadId: 'ablation-context' } })
+      await request.patch(`/api/documents/${doc.id}`, {
+        data: { threadId: SEED_THREADS.ablationContext }
+      })
     ).json();
 
     expect(document.threadName).toBe('Ablation: context window');

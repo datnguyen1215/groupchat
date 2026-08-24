@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { db } from './db';
 import { agentSkills, agents, documents, entries, skills, steps, threads } from './db/schema';
@@ -238,17 +239,14 @@ export const listThreads = async () => {
   return rows.map(r => ({ ...r, preview: previews.get(r.id) ?? 'No messages yet' }));
 };
 
-/** New threads start untitled; the user renames them from the sidebar or header. */
+/**
+ * New threads start untitled; the user renames them from the sidebar or header.
+ * The id is a UUID rather than a slug of the name — a slug would have to be
+ * uniquified against the table on every insert, and renaming a thread would
+ * leave its URL pointing at the old title.
+ */
 export const createThread = async (name: string) => {
-  const base = slugify(name);
-  const rows = await db
-    .select({ id: threads.id })
-    .from(threads)
-    .where(sql`${threads.id} = ${base} or ${threads.id} like ${base + '-%'}`);
-  const taken = new Set(rows.map(r => r.id));
-  let id = base;
-  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
-
+  const id = randomUUID();
   await db.insert(threads).values({ id, name, group: 'Active' });
   return id;
 };
@@ -310,7 +308,7 @@ export const appendMessage = async (input: {
   docId?: string;
 }) => {
   const seq = await nextSeq(input.threadId);
-  const id = `${input.threadId}-e${seq}`;
+  const id = randomUUID();
   await db.insert(entries).values({
     id,
     threadId: input.threadId,
@@ -333,7 +331,7 @@ export const appendActivity = async (input: {
   bars: ('ok' | 'run' | 'spawn')[];
 }) => {
   const seq = await nextSeq(input.threadId);
-  const id = `${input.threadId}-a${seq}`;
+  const id = randomUUID();
   await db.insert(entries).values({
     id,
     threadId: input.threadId,
@@ -399,7 +397,7 @@ export const appendStep = async (input: {
     .from(steps)
     .where(eq(steps.threadId, input.threadId));
   const seq = (row?.max ?? 0) + 1;
-  const id = `${input.threadId}-s${seq}`;
+  const id = randomUUID();
   await db.insert(steps).values({
     id,
     threadId: input.threadId,
