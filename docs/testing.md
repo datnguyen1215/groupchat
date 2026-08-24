@@ -10,11 +10,11 @@ npm run test:api   # playwright — HTTP against a real server and database
 npm run test:ui    # playwright — Chromium at 1440×900
 ```
 
-| Layer | Where | Count | Runtime |
-| --- | --- | --- | --- |
-| Unit | `tests/unit/` | 31 | ~0.1s |
-| API | `tests/e2e/api/` | 49 | ~2.5s |
-| UI | `tests/e2e/ui/` | 32 | ~10s |
+| Layer | Where            | Count | Runtime |
+| ----- | ---------------- | ----- | ------- |
+| Unit  | `tests/unit/`    | 31    | ~0.1s   |
+| API   | `tests/e2e/api/` | 49    | ~2.5s   |
+| UI    | `tests/e2e/ui/`  | 32    | ~10s    |
 
 ## Schema isolation
 
@@ -67,7 +67,7 @@ Skipping it produces flaky failures that look like missing elements.
   does not match. Target them by `href`.
 - Both the threads lane and the docs lane are `<aside>`. The docs lane is
   `aside.w-[280px]`, and it is closed by default — open it from the header's
-  *Documents* button first.
+  _Documents_ button first.
 - The modal scrim carries `aria-label="Close"` outside the dialog, so scope close
   buttons to `getByRole('dialog')`.
 - `toHaveClass` matches the whole class string; use `toContainClass` for one

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { parseInline } from '$lib/markdown';
+  import { parseInline } from '$lib/markdown';
 
-	type Props = { text: string };
-	const { text }: Props = $props();
+  type Props = { text: string };
+  const { text }: Props = $props();
 
-	const spans = $derived(parseInline(text));
+  const spans = $derived(parseInline(text));
 </script>
 
 <!-- prettier-ignore -->

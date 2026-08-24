@@ -8,31 +8,31 @@ const PORT = Number(process.env.TEST_PORT || 10202);
  * schema and seeds it once.
  */
 export default defineConfig({
-	testDir: './tests/e2e',
-	globalSetup: './tests/support/global-setup.ts',
-	fullyParallel: true,
-	workers: process.env.CI ? 2 : undefined,
-	forbidOnly: Boolean(process.env.CI),
-	retries: process.env.CI ? 1 : 0,
-	reporter: process.env.CI ? 'line' : [['list']],
-	use: {
-		baseURL: `http://localhost:${PORT}`,
-		trace: 'retain-on-failure'
-	},
-	projects: [
-		{ name: 'api', testMatch: /api\/.*\.spec\.ts/ },
-		{
-			name: 'ui',
-			testMatch: /ui\/.*\.spec\.ts/,
-			use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }
-		}
-	],
-	webServer: {
-		command: `vite dev --port ${PORT} --strictPort`,
-		port: PORT,
-		reuseExistingServer: false,
-		env: {
-			DATABASE_SCHEMA: process.env.DATABASE_SCHEMA || 'test'
-		}
-	}
+  testDir: './tests/e2e',
+  globalSetup: './tests/support/global-setup.ts',
+  fullyParallel: true,
+  workers: process.env.CI ? 2 : undefined,
+  forbidOnly: Boolean(process.env.CI),
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI ? 'line' : [['list']],
+  use: {
+    baseURL: `http://localhost:${PORT}`,
+    trace: 'retain-on-failure'
+  },
+  projects: [
+    { name: 'api', testMatch: /api\/.*\.spec\.ts/ },
+    {
+      name: 'ui',
+      testMatch: /ui\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }
+    }
+  ],
+  webServer: {
+    command: `vite dev --port ${PORT} --strictPort`,
+    port: PORT,
+    reuseExistingServer: false,
+    env: {
+      DATABASE_SCHEMA: process.env.DATABASE_SCHEMA || 'test'
+    }
+  }
 });

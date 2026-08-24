@@ -9,7 +9,7 @@ import { databaseUrl } from './url';
  * The tables are identical; only the `search_path` differs.
  */
 const client = postgres(databaseUrl(env.DATABASE_URL), {
-	connection: { search_path: env.DATABASE_SCHEMA || 'public' }
+  connection: { search_path: env.DATABASE_SCHEMA || 'public' }
 });
 
 export const db = drizzle(client, { schema });

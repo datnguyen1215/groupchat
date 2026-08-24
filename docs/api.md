@@ -23,15 +23,15 @@ Errors are SvelteKit's error shape, with per-field detail on a 422:
 }
 ```
 
-| Status | When |
-| --- | --- |
-| 200 | Read or update succeeded |
-| 201 | Created |
-| 204 | Deleted, no body |
-| 400 | Malformed JSON, or a patch with no writable field |
-| 404 | No such id |
-| 409 | Delete refused — the row is still referenced |
-| 422 | Validation failed; see `invalid` |
+| Status | When                                              |
+| ------ | ------------------------------------------------- |
+| 200    | Read or update succeeded                          |
+| 201    | Created                                           |
+| 204    | Deleted, no body                                  |
+| 400    | Malformed JSON, or a patch with no writable field |
+| 404    | No such id                                        |
+| 409    | Delete refused — the row is still referenced      |
+| 422    | Validation failed; see `invalid`                  |
 
 Validation collects **every** field problem before responding, so a form fixes
 in one round trip rather than one field per request.
@@ -52,10 +52,10 @@ should sort or compare on.
 
 ### `GET /api/skills`
 
-| Query | What |
-| --- | --- |
-| `authoredBy` | `you` or `agent` |
-| `q` | Substring match over name and description |
+| Query        | What                                      |
+| ------------ | ----------------------------------------- |
+| `authoredBy` | `you` or `agent`                          |
+| `q`          | Substring match over name and description |
 
 ### `POST /api/skills` → 201
 
@@ -94,10 +94,10 @@ Accepts `name`, `description`, `body`, `uses`. At least one is required.
 
 ### `GET /api/documents`
 
-| Query | What |
-| --- | --- |
-| `threadId` | Only documents in that thread |
-| `q` | Substring match over name, thread name, and author |
+| Query      | What                                               |
+| ---------- | -------------------------------------------------- |
+| `threadId` | Only documents in that thread                      |
+| `q`        | Substring match over name, thread name, and author |
 
 ### `POST /api/documents` → 201
 
@@ -171,7 +171,7 @@ not cascade on purpose: deleting an author would orphan real content.
 
 **No version history.** `version` is an integer bumped in place; there is no
 `skill_versions` table. An agent revising a skill you wrote overwrites it — it
-does not fork. The document modal's *History* button stays inert until history
+does not fork. The document modal's _History_ button stays inert until history
 is modeled.
 
 **No `POST /api/skills/:id/use`.** `uses` is writable through `PATCH`, which

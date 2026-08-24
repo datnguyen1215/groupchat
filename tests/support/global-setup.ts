@@ -7,15 +7,15 @@ import { seedBase } from './fixtures';
  * run and before the dev server starts serving.
  */
 export default async () => {
-	// `.env` is optional — every reader falls back to the compose defaults.
-	config({ path: '.env', quiet: true });
+  // `.env` is optional — every reader falls back to the compose defaults.
+  config({ path: '.env', quiet: true });
 
-	await resetSchema();
+  await resetSchema();
 
-	const sql = connect();
-	try {
-		await seedBase(sql);
-	} finally {
-		await sql.end();
-	}
+  const sql = connect();
+  try {
+    await seedBase(sql);
+  } finally {
+    await sql.end();
+  }
 };

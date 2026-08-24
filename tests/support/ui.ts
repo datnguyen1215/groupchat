@@ -6,12 +6,12 @@ import { expect, type Page } from '@playwright/test';
  * Waiting on the rail's active-state class is the cheapest hydration signal.
  */
 export const ready = async (page: Page, path: string) => {
-	await page.goto(path);
-	await page.waitForLoadState('networkidle');
-	await expect(page.locator('nav a').first()).toBeVisible();
-	await page.waitForFunction(() => document.querySelectorAll('button').length > 0);
-	/* Svelte attaches listeners on the microtask after paint. */
-	await page.waitForTimeout(250);
+  await page.goto(path);
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('nav a').first()).toBeVisible();
+  await page.waitForFunction(() => document.querySelectorAll('button').length > 0);
+  /* Svelte attaches listeners on the microtask after paint. */
+  await page.waitForTimeout(250);
 };
 
 /** The scrim also carries `aria-label="Close"`, so modal lookups scope to the dialog. */

@@ -7,6 +7,6 @@ import { listDocuments, listSkills } from '$lib/server/repo';
  * fetch with a loading state.
  */
 export const load = async () => {
-	const [documents, skills] = await Promise.all([listDocuments(), listSkills()]);
-	return { documents, skills };
+  const [documents, skills] = await Promise.all([listDocuments(), listSkills()]);
+  return { documents, skills };
 };

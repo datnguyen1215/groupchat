@@ -20,25 +20,25 @@ npm run dev           # http://localhost:10200
 Every service runs in the **10200+** range — no framework defaults. See
 `CLAUDE.md`.
 
-| Port | Service |
-| --- | --- |
-| 10200 | Dev server |
-| 10201 | Postgres (Docker) |
+| Port  | Service                  |
+| ----- | ------------------------ |
+| 10200 | Dev server               |
+| 10201 | Postgres (Docker)        |
 | 10202 | Test server (Playwright) |
-| 10203 | Preview server |
+| 10203 | Preview server           |
 
 `.env` is optional — the defaults above are compiled in
 (`src/lib/server/db/url.ts` and `docker-compose.yml`). To override, copy
 `.env.example` to `.env` and change `POSTGRES_PORT` and `DATABASE_URL`
 together.
 
-| Script | What |
-| --- | --- |
-| `db:up` / `db:down` | Start / stop the Postgres container |
-| `db:generate` | Generate a migration from `schema.ts` after editing it |
-| `db:migrate` | Apply pending migrations |
-| `db:seed` | Truncate and reload the fixtures. Idempotent |
-| `db:studio` | Drizzle Studio, a browser UI over the tables |
+| Script              | What                                                   |
+| ------------------- | ------------------------------------------------------ |
+| `db:up` / `db:down` | Start / stop the Postgres container                    |
+| `db:generate`       | Generate a migration from `schema.ts` after editing it |
+| `db:migrate`        | Apply pending migrations                               |
+| `db:seed`           | Truncate and reload the fixtures. Idempotent           |
+| `db:studio`         | Drizzle Studio, a browser UI over the tables           |
 
 ## Tests
 
@@ -74,13 +74,13 @@ threads sidebar; **Agents / Skills / Docs** are global full-page routes.
 
 ## Routes
 
-| Route | What |
-| --- | --- |
-| `/` | Redirects to the first thread |
-| `/chats/[id]` | Conversation, activity drawer, thread documents |
-| `/agents` | Orchestrator, research roster, agents spawned this session |
-| `/skills` | Skill registry with filters; modal has About / Used by |
-| `/documents` | Every document across all threads, as a table |
+| Route         | What                                                       |
+| ------------- | ---------------------------------------------------------- |
+| `/`           | Redirects to the first thread                              |
+| `/chats/[id]` | Conversation, activity drawer, thread documents            |
+| `/agents`     | Orchestrator, research roster, agents spawned this session |
+| `/skills`     | Skill registry with filters; modal has About / Used by     |
+| `/documents`  | Every document across all threads, as a table              |
 
 ## Layout
 
@@ -105,7 +105,7 @@ Seven tables. Two decisions worth knowing:
 version. A skill is a reusable capability with author provenance (you vs. agent)
 and a use count; a document belongs to exactly one thread.
 
-**`usedBy` is a join, not a column.** The fixtures stored it on the skill *and*
+**`usedBy` is a join, not a column.** The fixtures stored it on the skill _and_
 as a `skills` array on each agent, which could disagree. `agent_skills` is now
 the single source and the seed unions both fixture fields into it.
 
