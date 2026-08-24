@@ -3,6 +3,7 @@
   import { threads } from '$lib/data/threads';
   import { you } from '$lib/data/agents';
   import Avatar from './Avatar.svelte';
+  import Logo from './Logo.svelte';
 
   /* The divider encodes scope: Chats is thread-scoped, everything below is global. */
   const threadScoped = [
@@ -33,9 +34,9 @@
 {/snippet}
 
 <nav class="flex w-[66px] flex-none flex-col items-center gap-[2px] border-r border-line py-3">
-  <div
-    class="mb-3 h-6 w-6 flex-none rounded-[7px] bg-gradient-to-br from-[#7aa2ff] to-[#b47aff]"
-  ></div>
+  <a href="/" title="groupchat" class="mb-3 flex-none">
+    <Logo size={24} title="groupchat" />
+  </a>
 
   {#each threadScoped as item (item.href)}
     {@render railLink(item)}

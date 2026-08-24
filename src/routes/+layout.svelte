@@ -1,6 +1,6 @@
 <script lang="ts">
   import './layout.css';
-  import favicon from '$lib/assets/favicon.svg';
+  import favicon from '$lib/assets/logo.svg';
   import DocModal from '$lib/components/DocModal.svelte';
   import Rail from '$lib/components/Rail.svelte';
   import SkillModal from '$lib/components/SkillModal.svelte';
