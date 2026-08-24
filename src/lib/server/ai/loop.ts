@@ -6,6 +6,10 @@ import { MAX_STEPS, chatModel, noThinking } from './model';
 import { orchestratorPrompt, workerPrompt } from './prompts';
 import { orchestratorTools, workerTools, type ToolContext } from './tools';
 import { appendActivity, appendMessage, appendStep, listEntries, setAgentStatus } from '../repo';
+import { logger, since } from '../logger';
+import { detailOf } from './detail';
+
+const log = logger('agent');
 
 /** Tool calls that are the agent talking, not the agent working. */
 export const SPEECH = new Set(['send_chat_message', 'finish']);
@@ -62,16 +66,6 @@ const recordSteps = async (
   await appendActivity({ threadId, label: `${label} · ${bars.length} tools`, bars });
 };
 
-/** A one-line summary of a tool's input, for the drawer's detail column. */
-export const detailOf = (input: unknown) => {
-  if (!input || typeof input !== 'object') return '';
-  const values = Object.values(input as Record<string, unknown>)
-    .filter(v => typeof v === 'string')
-    .map(v => v as string);
-  const first = values[0] ?? '';
-  return first.length > 80 ? `${first.slice(0, 77)}...` : first;
-};
-
 const agentRow = async (id: string) => {
   const [row] = await db.select().from(agents).where(eq(agents.id, id));
   return row ?? null;
@@ -83,9 +77,14 @@ const agentRow = async (id: string) => {
  */
 const runWorker = async (threadId: string, agentId: string, task: string) => {
   const agent = await agentRow(agentId);
-  if (!agent) return `No agent with id "${agentId}".`;
+  if (!agent) {
+    log.warn({ agentId, threadId }, 'worker not found');
+    return `No agent with id "${agentId}".`;
+  }
 
   await setAgentStatus(agentId, 'busy', 'Working', threadId);
+  const start = Date.now();
+  log.info({ agentId, agentName: agent.name, threadId, task }, 'worker start');
 
   try {
     const ctx: ToolContext = { threadId, agentId, tag: agent.role || 'agent' };
@@ -99,6 +98,19 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
     });
 
     await recordSteps(threadId, agent.name, result.steps);
+    log.info(
+      {
+        agentId,
+        agentName: agent.name,
+        threadId,
+        steps: result.steps.length,
+        tools: result.steps.flatMap(s => s.toolCalls ?? []).map(c => c.toolName),
+        finish: result.finishReason,
+        tokens: result.usage?.totalTokens,
+        ms: since(start)
+      },
+      'worker done'
+    );
 
     /** `finish` leaves no text, so the last thing said in chat is the report. */
     return result.text.trim() || `${agent.name} finished the task.`;
@@ -107,7 +119,10 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
      * Handed back as the report rather than rethrown: the orchestrator asked
      * this agent for an answer, and "I failed" is an answer it can act on.
      */
-    console.error(`[agent loop] ${agent.name}`, error);
+    log.error(
+      { agentId, agentName: agent.name, threadId, ms: since(start), err: error },
+      'worker failed'
+    );
     return `${agent.name} could not finish — ${describe(error)}.`;
   } finally {
     /** Always. A stuck `busy` row is a presence indicator that never clears. */
@@ -122,9 +137,14 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
  */
 export const runOrchestrator = async (threadId: string) => {
   const [orch] = await db.select().from(agents).where(eq(agents.kind, 'orchestrator'));
-  if (!orch) return;
+  if (!orch) {
+    log.error({ threadId }, 'no orchestrator agent — turn skipped');
+    return;
+  }
 
   await setAgentStatus(orch.id, 'busy', 'Thinking', threadId);
+  const start = Date.now();
+  log.info({ agentId: orch.id, agentName: orch.name, threadId }, 'turn start');
 
   try {
     const ctx: ToolContext = { threadId, agentId: orch.id, tag: 'orch' };
@@ -138,13 +158,25 @@ export const runOrchestrator = async (threadId: string) => {
     });
 
     await recordSteps(threadId, orch.name, result.steps);
+    log.info(
+      {
+        agentId: orch.id,
+        threadId,
+        steps: result.steps.length,
+        tools: result.steps.flatMap(s => s.toolCalls ?? []).map(c => c.toolName),
+        finish: result.finishReason,
+        tokens: result.usage?.totalTokens,
+        ms: since(start)
+      },
+      'turn done'
+    );
   } catch (error) {
     /**
      * The turn is over and nobody is coming. Saying so in the thread is the
      * only way the failure reaches the person who is waiting on a reply —
      * there is no streaming channel to report it on.
      */
-    console.error('[agent loop]', error);
+    log.error({ agentId: orch.id, threadId, ms: since(start), err: error }, 'turn failed');
     await appendMessage({
       threadId,
       authorId: orch.id,
@@ -188,7 +220,8 @@ const statusOf = (error: unknown) => {
  * crash here must not take the request down with it.
  */
 export const startTurn = (threadId: string) => {
+  log.info({ threadId }, 'turn queued');
   void runOrchestrator(threadId).catch(error => {
-    console.error('[agent loop]', error);
+    log.error({ threadId, err: error }, 'detached turn crashed');
   });
 };

@@ -2,6 +2,9 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import Icon from './Icon.svelte';
+  import { trace } from '$lib/logger.svelte';
+
+  const log = trace('ThreadList');
 
   type Thread = {
     id: string;
@@ -27,13 +30,18 @@
   let pending = $state<{ id: string; name: string } | null>(null);
 
   const create = async () => {
+    log.info('create thread');
     const res = await fetch('/api/threads', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name: 'Untitled' })
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      log.error({ status: res.status }, 'create failed');
+      return;
+    }
     const { thread } = await res.json();
+    log.info({ threadId: thread.id }, 'created');
     await invalidateAll();
     await goto(`/chats/${thread.id}`);
     startRename(thread.id, thread.name);
@@ -46,6 +54,7 @@
   };
 
   const startRename = (id: string, name: string) => {
+    log.info({ threadId: id, name }, 'rename started');
     menu = null;
     renamingId = id;
     draft = name;
@@ -55,12 +64,20 @@
     const id = renamingId;
     const name = draft.trim();
     renamingId = null;
-    if (!id || !name) return;
-    await fetch(`/api/threads/${id}`, {
+    if (!id || !name) {
+      log.info({ threadId: id }, 'rename cancelled — empty');
+      return;
+    }
+
+    const res = await fetch(`/api/threads/${id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name })
     });
+
+    if (res.ok) log.info({ threadId: id, name }, 'renamed');
+    else log.error({ threadId: id, name, status: res.status }, 'rename failed');
+
     await invalidateAll();
   };
 
@@ -70,6 +87,7 @@
   };
 
   const askDelete = (id: string, name: string) => {
+    log.info({ threadId: id, name }, 'delete confirmation opened');
     menu = null;
     pending = { id, name };
   };
@@ -78,8 +96,13 @@
     const target = pending;
     pending = null;
     if (!target) return;
+
     const res = await fetch(`/api/threads/${target.id}`, { method: 'DELETE' });
-    if (!res.ok) return;
+    if (!res.ok) {
+      log.error({ threadId: target.id, status: res.status }, 'delete failed');
+      return;
+    }
+    log.info({ threadId: target.id, name: target.name }, 'deleted');
     /* Leave the thread first — its route would 404 once the row is gone. The
        live event for the delete also invalidates, and racing it against the
        navigation would re-run the dead route's load, so the goto carries the
@@ -124,6 +147,7 @@
           class:bg-panel-2={page.params.id === thread.id}
           oncontextmenu={e => {
             e.preventDefault();
+            log.debug({ threadId: thread.id }, 'context menu');
             menu = { id: thread.id, x: e.clientX, y: e.clientY };
           }}
         >

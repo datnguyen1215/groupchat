@@ -1,5 +1,8 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
+  import { trace } from '$lib/logger.svelte';
+
+  const log = trace('Composer');
 
   let draft = $state('');
   let form: HTMLFormElement;
@@ -16,10 +19,16 @@
 <form
   method="POST"
   bind:this={form}
-  use:enhance={() => {
+  use:enhance={({ formData }) => {
+    const chars = formData.get('message')?.toString().length ?? 0;
+    log.info({ chars }, 'message submitted');
+
     /* Clear optimistically; the redirect re-renders the thread with it stored. */
     draft = '';
-    return async ({ update }) => update();
+    return async ({ update, result }) => {
+      log.info({ type: result.type }, 'submit settled');
+      await update();
+    };
   }}
   class="flex-none px-6 pt-2 pb-5"
 >

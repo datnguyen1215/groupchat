@@ -5,6 +5,14 @@ import { agentSkills, agents, documents, entries, skills, steps, threads } from 
 import { agentDto, documentDto, skillDto, type Stat } from './serialize';
 import { relativeTime, slugify } from './api';
 import { publish } from './events/bus';
+import { logger } from './logger';
+
+/**
+ * Writes log at `info`; reads do not. A read is already accounted for by the
+ * request line in `hooks.server.ts`, but a write is the thing you work
+ * backwards from when the data is wrong.
+ */
+const log = logger('repo');
 
 /**
  * Read helpers shared by the routes. Each returns the frontend-facing DTO, so a
@@ -170,6 +178,7 @@ export const setAgentSkills = async (agentId: string, skillIds: string[]) => {
   await db.delete(agentSkills).where(eq(agentSkills.agentId, agentId));
   if (skillIds.length)
     await db.insert(agentSkills).values(skillIds.map(skillId => ({ agentId, skillId })));
+  log.info({ agentId, skillIds }, 'agent skills set');
 };
 
 export const existingSkillIds = async (ids: string[]) => {
@@ -249,12 +258,14 @@ export const listThreads = async () => {
 export const createThread = async (name: string) => {
   const id = randomUUID();
   await db.insert(threads).values({ id, name, group: 'Active' });
+  log.info({ id, threadName: name }, 'thread created');
   publish({ scope: 'threads' });
   return id;
 };
 
 export const renameThread = async (id: string, name: string) => {
   await db.update(threads).set({ name, updatedAt: new Date() }).where(eq(threads.id, id));
+  log.info({ id, threadName: name }, 'thread renamed');
   publish({ scope: 'threads' });
   publish({ scope: 'thread', threadId: id });
 };
@@ -262,6 +273,7 @@ export const renameThread = async (id: string, name: string) => {
 /** Cascades take care of the thread's documents, entries and steps. */
 export const deleteThread = async (id: string) => {
   await db.delete(threads).where(eq(threads.id, id));
+  log.info({ id }, 'thread deleted');
   publish({ scope: 'threads' });
   /** Anyone still viewing it needs to find out the thread is gone. */
   publish({ scope: 'thread', threadId: id });
@@ -331,6 +343,17 @@ export const appendMessage = async (input: {
     paragraphs: input.paragraphs,
     docId: input.docId ?? null
   });
+  log.info(
+    {
+      id,
+      threadId: input.threadId,
+      authorId: input.authorId,
+      seq,
+      chars: input.paragraphs.join('').length
+    },
+    'message appended'
+  );
+
   /** Thread order is recency, so a new message has to move the thread. */
   await db.update(threads).set({ updatedAt: new Date() }).where(eq(threads.id, input.threadId));
   /** Both scopes: the entry lands in the thread, and recency reorders the list. */
@@ -355,6 +378,10 @@ export const appendActivity = async (input: {
     label: input.label,
     bars: input.bars
   });
+  log.info(
+    { id, threadId: input.threadId, label: input.label, bars: input.bars.length },
+    'activity appended'
+  );
   publish({ scope: 'thread', threadId: input.threadId });
   return id;
 };
@@ -426,6 +453,10 @@ export const appendStep = async (input: {
     parentId: input.parentId ?? null,
     badge: input.badge ?? null
   });
+  log.info(
+    { id, threadId: input.threadId, name: input.name, state: input.state, ms: input.durationMs },
+    'step appended'
+  );
   publish({ scope: 'thread', threadId: input.threadId });
   return id;
 };
@@ -459,6 +490,8 @@ export const setAgentStatus = async (
     })
     .where(eq(agents.id, agentId));
 
+  log.info({ agentId, status, statusLabel, threadId }, 'agent status');
+
   for (const id of new Set([threadId, before?.busyThreadId].filter(Boolean) as string[]))
     publish({ scope: 'thread', threadId: id });
 };
@@ -480,6 +513,9 @@ export const clearStaleBusy = async (olderThanMs = 5 * 60_000) => {
     .update(agents)
     .set({ status: 'idle', statusLabel: 'Idle', busyThreadId: null })
     .where(and(eq(agents.status, 'busy'), lt(agents.updatedAt, cutoff)));
+
+  /** Warn, not info: reaching here means a turn died without its `finally`. */
+  log.warn({ count: stale.length, olderThanMs }, 'cleared stale busy agents');
 
   for (const id of new Set(stale.map(row => row.busyThreadId).filter(Boolean) as string[]))
     publish({ scope: 'thread', threadId: id });

@@ -12,6 +12,50 @@ import {
   listSkills,
   uniqueId
 } from '../repo';
+import { logger, since } from '../logger';
+import { detailOf } from './detail';
+
+const log = logger('tool');
+
+/**
+ * Wraps every tool's `execute` with one log pair: the call with its input, the
+ * result with its duration. Applied once to the whole tool set rather than
+ * written into each tool, so a new tool is traced the day it is added and no
+ * two tools log in different shapes.
+ *
+ * Input is logged in full at `debug` — a document body belongs there, not in
+ * the default stream — and summarised at `info` via `detailOf`.
+ */
+const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T => {
+  const wrapped = Object.entries(tools).map(([name, definition]) => {
+    const run = definition.execute;
+    const execute = async (input: unknown, options: unknown) => {
+      const start = Date.now();
+      const base = { tool: name, agentId: ctx.agentId, threadId: ctx.threadId };
+
+      log.info({ ...base, detail: detailOf(input) }, 'call');
+      log.debug({ ...base, input }, 'call input');
+
+      try {
+        const result = await run(input, options);
+        /** A tool that returns `{ error }` failed the agent without throwing. */
+        const failed = Boolean(result && typeof result === 'object' && 'error' in result);
+        log[failed ? 'warn' : 'info'](
+          { ...base, ms: since(start), ...(failed ? { error: result.error } : {}) },
+          failed ? 'rejected' : 'ok'
+        );
+        log.debug({ ...base, result }, 'call result');
+        return result;
+      } catch (error) {
+        log.error({ ...base, ms: since(start), err: error }, 'threw');
+        throw error;
+      }
+    };
+    return [name, { ...definition, execute }];
+  });
+
+  return Object.fromEntries(wrapped) as T;
+};
 
 /**
  * The agents' tools. Every one of them goes through `repo.ts`, the same module
@@ -227,10 +271,11 @@ const writeTools = (ctx: ToolContext) => ({
 });
 
 /** What a spawned worker can do: read, write, speak, stop. */
-export const workerTools = (ctx: ToolContext) => ({
-  ...readTools(ctx),
-  ...writeTools(ctx)
-});
+export const workerTools = (ctx: ToolContext) =>
+  traced(ctx, {
+    ...readTools(ctx),
+    ...writeTools(ctx)
+  });
 
 /**
  * The orchestrator's extra two. `run_agent` blocks until the worker's loop
@@ -240,36 +285,37 @@ export const workerTools = (ctx: ToolContext) => ({
 export const orchestratorTools = (
   ctx: ToolContext,
   runAgent: (agentId: string, task: string) => Promise<string>
-) => ({
-  ...readTools(ctx),
-  ...writeTools(ctx),
+) =>
+  traced(ctx, {
+    ...readTools(ctx),
+    ...writeTools(ctx),
 
-  list_agents: tool({
-    description: 'List the agents you can delegate work to.',
-    inputSchema: z.object({}),
-    execute: async () => {
-      const all = await listAgents('research');
-      return all.map(a => ({
-        id: a.id,
-        name: a.name,
-        role: a.role,
-        description: a.description,
-        status: a.status
-      }));
-    }
-  }),
-
-  run_agent: tool({
-    description:
-      'Delegate a task to one agent and wait for its report. The agent works, ' +
-      'posts its own messages to the chat, and returns a summary to you.',
-    inputSchema: z.object({
-      agentId: z.string().describe('The agent id from list_agents.'),
-      task: z.string().describe('What you want that agent to do. Be specific.')
+    list_agents: tool({
+      description: 'List the agents you can delegate work to.',
+      inputSchema: z.object({}),
+      execute: async () => {
+        const all = await listAgents('research');
+        return all.map(a => ({
+          id: a.id,
+          name: a.name,
+          role: a.role,
+          description: a.description,
+          status: a.status
+        }));
+      }
     }),
-    execute: async ({ agentId, task }) => {
-      const report = await runAgent(agentId, task);
-      return { agentId, report };
-    }
-  })
-});
+
+    run_agent: tool({
+      description:
+        'Delegate a task to one agent and wait for its report. The agent works, ' +
+        'posts its own messages to the chat, and returns a summary to you.',
+      inputSchema: z.object({
+        agentId: z.string().describe('The agent id from list_agents.'),
+        task: z.string().describe('What you want that agent to do. Be specific.')
+      }),
+      execute: async ({ agentId, task }) => {
+        const report = await runAgent(agentId, task);
+        return { agentId, report };
+      }
+    })
+  });
