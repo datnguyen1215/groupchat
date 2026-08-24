@@ -1,11 +1,13 @@
 <script lang="ts">
   import { page } from '$app/state';
-  import { threads } from '$lib/data/threads';
 
-  const groups = [
+  type Thread = { id: string; name: string; group: string; live: boolean; unread: number; preview: string };
+  const { threads }: { threads: Thread[] } = $props();
+
+  const groups = $derived([
     { label: 'Active', items: threads.filter(t => t.group === 'Active') },
     { label: 'Recent', items: threads.filter(t => t.group === 'Recent') }
-  ];
+  ]);
 </script>
 
 <aside class="flex w-[230px] min-h-0 flex-none flex-col border-r border-line">

@@ -23,6 +23,11 @@ export const agents = pgTable('agents', {
   description: text('description').notNull().default(''),
   status: agentStatus('status').notNull().default('idle'),
   statusLabel: text('status_label').notNull().default('Idle'),
+  /**
+   * Which thread this agent is busy in; null when idle. An agent is a global
+   * row, so `status` alone would render a presence row in every thread at once.
+   */
+  busyThreadId: text('busy_thread_id'),
   /** Ephemeral agents collapse into one card; this is the ×3 in `paper-reader ×3`. */
   instances: integer('instances').notNull().default(1),
   spawnedBy: text('spawned_by'),

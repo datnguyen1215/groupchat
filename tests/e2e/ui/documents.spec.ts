@@ -43,7 +43,8 @@ test.describe('documents page', () => {
 });
 
 test.describe('thread documents', () => {
-  test.beforeEach(async ({ page }) => await ready(page, '/'));
+  /* Named explicitly: `/` redirects to whichever thread is most recent. */
+  test.beforeEach(async ({ page }) => await ready(page, '/chats/retrieval-eval'));
 
   test('the chat sidebar opens from the header and is scoped to the thread', async ({ page }) => {
     /* The docs lane is optional and closed by default, matching the calm shell. */

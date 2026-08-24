@@ -1,187 +1,127 @@
 /**
- * One-shot migration of the `src/lib/data/` fixtures into Postgres.
- * Idempotent: truncates every table, then re-inserts. Safe to re-run.
+ * Seeds the cast and an empty thread. Idempotent: truncates, then re-inserts.
+ *
+ * There is no conversation here on purpose. Messages are what the agents
+ * produce; seeding them would make it impossible to tell a real turn from a
+ * fixture. The one thing that does matter is the agents' roles — the loop
+ * feeds `role` and `description` straight into each agent's system prompt, so
+ * conflicting mandates are what make them argue instead of agree.
  */
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { sql } from 'drizzle-orm';
 import * as s from '../src/lib/server/db/schema';
-import { orchestrator, researchAgents, spawnedAgents, you } from '../src/lib/data/agents';
-import { skills as skillFixtures } from '../src/lib/data/skills';
-import { documents as docFixtures } from '../src/lib/data/documents';
-import { threads as threadFixtures } from '../src/lib/data/threads';
 import { databaseUrl } from '../src/lib/server/db/url';
 
 const client = postgres(databaseUrl(process.env.DATABASE_URL));
 const db = drizzle(client, { schema: s });
 
-/** Fixtures reference agents by display name; the DB references them by id. */
-const idByName = new Map<string, string>();
+const agents = [
+  {
+    id: 'orchestrator',
+    name: 'Orchestrator',
+    initials: 'O',
+    color: '#7aa2ff',
+    kind: 'orchestrator' as const,
+    role: 'orch',
+    description:
+      'Decomposes the ask, assigns agents, and decides when a thread is done. Never answers directly.'
+  },
+  {
+    id: 'kestrel',
+    name: 'Kestrel',
+    initials: 'K',
+    color: '#4ec98a',
+    kind: 'research' as const,
+    role: 'analyst',
+    description:
+      "You design measurements and read results honestly. You push back when a number cannot support the claim being made."
+  },
+  {
+    id: 'wren',
+    name: 'Wren',
+    initials: 'W',
+    color: '#e8785d',
+    kind: 'research' as const,
+    role: 'researcher',
+    description:
+      'You find and summarise prior art. You say plainly when the evidence is thin rather than filling the gap with plausible sentences.'
+  },
+  {
+    id: 'finch',
+    name: 'Finch',
+    initials: 'F',
+    color: '#b47aff',
+    kind: 'research' as const,
+    role: 'critic',
+    description:
+      'You argue the other side. You look for the assumption nobody stated and the cost nobody costed. Agreeing is not your job.'
+  },
+  {
+    id: 'you',
+    name: 'You',
+    initials: 'DN',
+    color: '#5b5b66',
+    kind: 'you' as const,
+    role: '',
+    description: ''
+  }
+];
 
-/** `'Yesterday'`, `'Mon'`, `'just now'` — relative strings with no anchor. Seeded as offsets from now. */
-const ago = (days: number) => new Date(Date.now() - days * 86_400_000);
-
-const parseVersion = (v: string) => Number(v.replace(/^v/, '')) || 1;
-
-const durationToMs = (d: string): number | null => {
-  const m = /^([\d.]+)\s*(ms|s|m)$/.exec(d.trim());
-  if (!m) return null;
-  const n = Number(m[1]);
-  return Math.round(m[2] === 'ms' ? n : m[2] === 's' ? n * 1000 : n * 60_000);
-};
+const skills = [
+  {
+    id: 'eval-harness',
+    name: 'eval-harness',
+    description: 'How to structure a retrieval evaluation so the numbers mean something.',
+    authorId: 'kestrel',
+    authoredBy: 'agent' as const,
+    body: '# eval-harness\n\nPick metrics before you see results. Report recall@k and MRR together — recall alone hides ranking quality.\n\nHold the token budget fixed across arms, or the comparison measures budget, not the change.'
+  },
+  {
+    id: 'paper-reader',
+    name: 'paper-reader',
+    description: 'Read a paper for the claim, the evidence, and the gap between them.',
+    authorId: 'wren',
+    authoredBy: 'agent' as const,
+    body: '# paper-reader\n\nState the claim in one sentence. Then the evidence offered. Then what the evidence does not cover.\n\nA reported speedup that is not wall-clock is not a speedup.'
+  },
+  {
+    id: 'relevance-judge',
+    name: 'relevance-judge',
+    description: 'Rubric for grading retrieval relevance with an LLM judge.',
+    authorId: 'finch',
+    authoredBy: 'agent' as const,
+    body: '# relevance-judge\n\nGrade 0-3: irrelevant, tangential, partial, fully answers.\n\nSpot-check ten percent by hand. An unchecked judge drifts and you will not notice.'
+  }
+];
 
 const main = async () => {
   await db.execute(
     sql`truncate table ${s.steps}, ${s.entries}, ${s.agentSkills}, ${s.documents}, ${s.skills}, ${s.threads}, ${s.agents} restart identity cascade`
   );
 
-  const agentRows = [
-    { ...orchestrator, kind: 'orchestrator' as const },
-    ...researchAgents.map(a => ({ ...a, kind: 'research' as const })),
-    ...spawnedAgents.map(a => ({ ...a, kind: 'spawned' as const })),
-    {
-      ...you,
-      kind: 'you' as const,
-      role: '',
-      description: '',
-      status: 'idle' as const,
-      statusLabel: 'Idle',
-      skills: [] as string[]
-    }
-  ];
-
   await db.insert(s.agents).values(
-    agentRows.map(a => {
-      idByName.set(a.name, a.id);
-      const multiplied = /×(\d+)\s*$/.exec(a.name);
-      return {
-        id: a.id,
-        name: a.name,
-        initials: a.initials,
-        color: a.color,
-        kind: a.kind,
-        role: a.role,
-        description: a.description,
-        status: a.status,
-        statusLabel: a.statusLabel,
-        instances: multiplied ? Number(multiplied[1]) : 1,
-        spawnedBy: /spawned by (\w+)/i.exec(a.role)?.[1] ?? null
-      };
-    })
+    agents.map(a => ({ ...a, status: 'idle' as const, statusLabel: 'Idle', instances: 1 }))
   );
 
-  await db.insert(s.threads).values(
-    threadFixtures.map(t => ({
-      id: t.id,
-      name: t.name,
-      group: t.group,
-      live: t.live,
-      unread: t.unread ?? 0
-    }))
-  );
+  await db.insert(s.threads).values([
+    { id: 'retrieval-eval', name: 'Retrieval eval design', group: 'Active' as const, live: true },
+    { id: 'ablation-context', name: 'Ablation: context window', group: 'Active' as const, live: false }
+  ]);
 
-  await db.insert(s.skills).values(
-    skillFixtures.map(sk => ({
-      id: sk.id,
-      name: sk.name,
-      version: parseVersion(sk.version),
-      description: sk.description,
-      authorId: idByName.get(sk.author) ?? you.id,
-      authoredBy: sk.authoredBy,
-      body: sk.body,
-      uses: sk.uses
-    }))
-  );
+  await db.insert(s.skills).values(skills);
 
-  await db.insert(s.documents).values(
-    docFixtures.map(d => ({
-      id: d.id,
-      name: d.name,
-      threadId: d.threadId,
-      authorId: idByName.get(d.author) ?? you.id,
-      version: parseVersion(d.version),
-      body: d.body,
-      updatedAt: ago(d.updated === 'just now' ? 0 : d.updated === 'Yesterday' ? 1 : 3)
-    }))
-  );
-
-  /**
-   * The join replaces both the skill's `usedBy` and the agent's `skills` array —
-   * the two fixture fields that could disagree. Union them, drop `'+2'` placeholders.
-   */
-  const pairs = new Set<string>();
-  for (const sk of skillFixtures)
-    for (const name of sk.usedBy) {
-      const agentId = idByName.get(name);
-      if (agentId) pairs.add(`${agentId} ${sk.id}`);
-    }
-  const skillIds = new Set(skillFixtures.map(sk => sk.id));
-  for (const a of [orchestrator, ...researchAgents])
-    for (const skillId of a.skills) if (skillIds.has(skillId)) pairs.add(`${a.id} ${skillId}`);
-
-  if (pairs.size)
-    await db.insert(s.agentSkills).values(
-      [...pairs].map(p => {
-        const [agentId, skillId] = p.split(' ');
-        return { agentId, skillId };
-      })
-    );
-
-  const docIds = new Set(docFixtures.map(d => d.id));
-
-  for (const t of threadFixtures) {
-    if (t.entries.length)
-      await db.insert(s.entries).values(
-        t.entries.map((e, i) => ({
-          id: `${t.id}-${e.id}`,
-          threadId: t.id,
-          kind: e.kind,
-          seq: i,
-          authorId: e.kind === 'message' ? (idByName.get(e.author) ?? null) : null,
-          tag: e.kind === 'message' ? (e.tag ?? null) : null,
-          paragraphs: e.kind === 'message' ? e.paragraphs : [],
-          docId: e.kind === 'message' && e.docId && docIds.has(e.docId) ? e.docId : null,
-          label: e.kind === 'activity' ? e.label : null,
-          bars: e.kind === 'activity' ? e.bars : []
-        }))
-      );
-
-    const stepRows = t.activity.flatMap(group =>
-      group.steps.map((step, i) => ({
-        id: `${t.id}-${step.id}`,
-        threadId: t.id,
-        groupLabel: group.label,
-        seq: i,
-        state: step.state,
-        name: step.name,
-        detail: step.detail,
-        durationMs: durationToMs(step.duration),
-        parentId: null as string | null,
-        badge: step.badge ?? null
-      }))
-    );
-
-    /** `child: true` is an indent flag; the DB stores the real parent — the nearest preceding non-child. */
-    let lastParent: string | null = null;
-    let cursor = 0;
-    for (const group of t.activity)
-      for (const step of group.steps) {
-        const row = stepRows[cursor++];
-        if (step.child) row.parentId = lastParent;
-        else lastParent = row.id;
-      }
-
-    if (stepRows.length) await db.insert(s.steps).values(stepRows);
-  }
+  await db.insert(s.agentSkills).values([
+    { agentId: 'kestrel', skillId: 'eval-harness' },
+    { agentId: 'wren', skillId: 'paper-reader' },
+    { agentId: 'finch', skillId: 'relevance-judge' }
+  ]);
 
   const counts = await db.execute(sql`
 		select 'agents' as name, count(*)::int as n from agents
 		union all select 'threads', count(*)::int from threads
 		union all select 'skills', count(*)::int from skills
-		union all select 'documents', count(*)::int from documents
-		union all select 'agent_skills', count(*)::int from agent_skills
 		union all select 'entries', count(*)::int from entries
-		union all select 'steps', count(*)::int from steps
 	`);
   console.table([...counts]);
   await client.end();

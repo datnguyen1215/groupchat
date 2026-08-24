@@ -1,14 +1,39 @@
 <script lang="ts">
   import type { Doc } from '$lib/data/documents';
-  import type { Entry } from '$lib/data/threads';
   import { page } from '$app/state';
   import { overlay } from '$lib/state/overlay.svelte';
   import Avatar from './Avatar.svelte';
   import Icon from './Icon.svelte';
   import Inline from './Inline.svelte';
+  import PresenceRow from './PresenceRow.svelte';
 
-  type Props = { entries: Entry[]; onopenactivity: () => void };
-  const { entries, onopenactivity }: Props = $props();
+  type Entry = {
+    kind: 'message' | 'activity';
+    id: string;
+    author: string;
+    initials: string;
+    color: string;
+    tag?: string;
+    isOrchestrator: boolean;
+    isYou: boolean;
+    time: string;
+    paragraphs: string[];
+    docId?: string;
+    label: string;
+    bars: ('ok' | 'run' | 'spawn')[];
+  };
+  type Busy = {
+    id: string;
+    name: string;
+    initials: string;
+    color: string;
+    tag: string;
+    statusLabel: string;
+    lastStep: { name: string; detail: string } | null;
+  };
+
+  type Props = { entries: Entry[]; busy: Busy[]; onopenactivity: () => void };
+  const { entries, busy, onopenactivity }: Props = $props();
 
   const barColor = { ok: 'bg-ok', run: 'bg-run', spawn: 'bg-accent' };
 </script>
@@ -69,5 +94,21 @@
         </article>
       {/if}
     {/each}
+
+    <!-- Presence rows sit after the stream, never inside it. -->
+    {#each busy as agent (agent.id)}
+      <PresenceRow
+        name={agent.name}
+        initials={agent.initials}
+        color={agent.color}
+        tag={agent.tag}
+        statusLabel={agent.statusLabel}
+        lastStep={agent.lastStep}
+      />
+    {/each}
+
+    {#if !entries.length && !busy.length}
+      <p class="text-[13px] text-ink-3">Nothing here yet. Say something to get started.</p>
+    {/if}
   </div>
 </div>

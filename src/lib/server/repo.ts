@@ -209,9 +209,35 @@ export const uniqueId = async (
  * progress lives in `steps` instead, and the UI reads it as a presence row.
  * ------------------------------------------------------------------------- */
 
+/**
+ * Most recently active first — a chat list is ordered by what just happened,
+ * not alphabetically. `preview` is the last thing said, the way the sidebar
+ * shows it.
+ */
 export const listThreads = async () => {
-	const rows = await db.select().from(threads).orderBy(asc(threads.name));
-	return rows.map((r) => ({ ...r, preview: '' }));
+	const rows = await db.select().from(threads).orderBy(desc(threads.updatedAt));
+
+	const latest = await db
+		.selectDistinctOn([entries.threadId], {
+			threadId: entries.threadId,
+			paragraphs: entries.paragraphs,
+			authorId: entries.authorId
+		})
+		.from(entries)
+		.where(eq(entries.kind, 'message'))
+		.orderBy(desc(entries.threadId), desc(entries.seq));
+
+	const authors = await authorIndex(
+		latest.map((r) => r.authorId).filter((id): id is string => !!id)
+	);
+	const previews = new Map(
+		latest.map((r) => {
+			const name = r.authorId ? (authors.get(r.authorId)?.name ?? '') : '';
+			return [r.threadId, `${name}: ${r.paragraphs[0] ?? ''}`];
+		})
+	);
+
+	return rows.map((r) => ({ ...r, preview: previews.get(r.id) ?? 'No messages yet' }));
 };
 
 export const getThread = async (id: string) => {
@@ -278,6 +304,11 @@ export const appendMessage = async (input: {
 		paragraphs: input.paragraphs,
 		docId: input.docId ?? null
 	});
+	/** Thread order is recency, so a new message has to move the thread. */
+	await db
+		.update(threads)
+		.set({ updatedAt: new Date() })
+		.where(eq(threads.id, input.threadId));
 	return id;
 };
 
@@ -370,21 +401,33 @@ export const appendStep = async (input: {
 	return id;
 };
 
-/** Drives the presence row and the agents page. */
+/**
+ * Drives the presence row and the agents page. `busyThreadId` is set alongside
+ * the status so a busy agent appears in the thread it is actually working in.
+ */
 export const setAgentStatus = async (
 	agentId: string,
 	status: 'idle' | 'busy' | 'done',
-	statusLabel: string
+	statusLabel: string,
+	threadId: string | null = null
 ) => {
 	await db
 		.update(agents)
-		.set({ status, statusLabel, updatedAt: new Date() })
+		.set({
+			status,
+			statusLabel,
+			busyThreadId: status === 'busy' ? threadId : null,
+			updatedAt: new Date()
+		})
 		.where(eq(agents.id, agentId));
 };
 
-/** Presence rows: who is mid-turn, and the last step each of them ran. */
+/** Presence rows: who is mid-turn in this thread, and the last step each ran. */
 export const listBusyAgents = async (threadId: string) => {
-	const rows = await db.select().from(agents).where(eq(agents.status, 'busy'));
+	const rows = await db
+		.select()
+		.from(agents)
+		.where(and(eq(agents.status, 'busy'), eq(agents.busyThreadId, threadId)));
 	if (!rows.length) return [];
 
 	const recent = await db

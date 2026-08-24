@@ -80,7 +80,18 @@ export const BASE = {
     }
   ],
   /** Kestrel uses eval-harness; drives the `usedBy` join assertions. */
-  agentSkills: [{ agentId: 'kestrel', skillId: 'eval-harness' }]
+  agentSkills: [{ agentId: 'kestrel', skillId: 'eval-harness' }],
+  /** One message carrying a document, so the chat's doc-chip has something to open. */
+  entries: [
+    {
+      id: 'retrieval-eval-e1',
+      threadId: 'retrieval-eval',
+      seq: 1,
+      authorId: 'kestrel',
+      paragraphs: ['Protocol is written up.'],
+      docId: 'eval-protocol-v1'
+    }
+  ]
 };
 
 export const seedBase = async (sql: Sql) => {
@@ -124,4 +135,15 @@ export const seedBase = async (sql: Sql) => {
 
   for (const j of BASE.agentSkills)
     await sql`insert into agent_skills ${sql({ agent_id: j.agentId, skill_id: j.skillId } as never)}`;
+
+  for (const e of BASE.entries)
+    await sql`insert into entries ${sql({
+      id: e.id,
+      thread_id: e.threadId,
+      kind: 'message',
+      seq: e.seq,
+      author_id: e.authorId,
+      paragraphs: sql.json(e.paragraphs),
+      doc_id: e.docId
+    } as never)}`;
 };

@@ -1,4 +1,4 @@
-import { listDocuments, listSkills } from '$lib/server/repo';
+import { listDocuments, listSkills, listThreads } from '$lib/server/repo';
 
 /**
  * DocModal and SkillModal are rendered by the layout and opened by id from any
@@ -7,6 +7,10 @@ import { listDocuments, listSkills } from '$lib/server/repo';
  * fetch with a loading state.
  */
 export const load = async () => {
-  const [documents, skills] = await Promise.all([listDocuments(), listSkills()]);
-  return { documents, skills };
+  const [documents, skills, threads] = await Promise.all([
+    listDocuments(),
+    listSkills(),
+    listThreads()
+  ]);
+  return { documents, skills, threads };
 };

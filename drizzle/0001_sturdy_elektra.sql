@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "busy_thread_id" text;
