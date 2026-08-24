@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
+  import Icon from './Icon.svelte';
 
   type Thread = {
     id: string;
@@ -21,6 +22,9 @@
   let menu = $state<{ id: string; x: number; y: number } | null>(null);
   let renamingId = $state<string | null>(null);
   let draft = $state('');
+  /* The thread awaiting delete confirmation, held by value so the dialog can
+     still name it after the row leaves the list. */
+  let pending = $state<{ id: string; name: string } | null>(null);
 
   const create = async () => {
     const res = await fetch('/api/threads', {
@@ -64,9 +68,32 @@
     if (event.key === 'Enter') commit();
     if (event.key === 'Escape') renamingId = null;
   };
+
+  const askDelete = (id: string, name: string) => {
+    menu = null;
+    pending = { id, name };
+  };
+
+  const confirmDelete = async () => {
+    const target = pending;
+    pending = null;
+    if (!target) return;
+    const res = await fetch(`/api/threads/${target.id}`, { method: 'DELETE' });
+    if (!res.ok) return;
+    /* Leave the thread first — its route would 404 once the row is gone. */
+    if (page.params.id === target.id) await goto('/');
+    await invalidateAll();
+  };
 </script>
 
-<svelte:window onclick={() => (menu = null)} onkeydown={e => e.key === 'Escape' && (menu = null)} />
+<svelte:window
+  onclick={() => (menu = null)}
+  onkeydown={e => {
+    if (e.key !== 'Escape') return;
+    if (pending) pending = null;
+    else menu = null;
+  }}
+/>
 
 <aside class="flex w-[230px] min-h-0 flex-none flex-col border-r border-line">
   <div class="flex items-center px-[15px] pt-[15px] pb-[10px]">
@@ -134,15 +161,64 @@
 
 {#if menu}
   {@const target = menu}
+  {@const name = threads.find(t => t.id === target.id)?.name ?? ''}
   <div
     class="fixed z-50 min-w-[140px] rounded-[9px] border border-line bg-panel py-1 shadow-lg"
     style="left: {target.x}px; top: {target.y}px"
   >
     <button
-      class="block w-full px-3 py-[6px] text-left text-[12.5px] text-ink-2 hover:bg-panel-2 hover:text-ink"
-      onclick={() => startRename(target.id, threads.find(t => t.id === target.id)?.name ?? '')}
+      class="flex w-full items-center gap-[9px] px-3 py-[6px] text-left text-[12.5px] text-ink-2 hover:bg-panel-2 hover:text-ink"
+      onclick={() => startRename(target.id, name)}
     >
+      <Icon name="pencil" />
       Rename
     </button>
+    <div class="my-1 h-px bg-line"></div>
+    <button
+      class="flex w-full items-center gap-[9px] px-3 py-[6px] text-left text-[12.5px] text-clay hover:bg-clay/[0.12]"
+      onclick={() => askDelete(target.id, name)}
+    >
+      <Icon name="trash" />
+      Delete
+    </button>
+  </div>
+{/if}
+
+{#if pending}
+  {@const target = pending}
+  <div class="fixed inset-0 z-60 grid place-items-center bg-black/55 px-5 backdrop-blur-[2px]">
+    <button
+      class="absolute inset-0 cursor-default"
+      onclick={() => (pending = null)}
+      aria-label="Dismiss"
+      tabindex="-1"
+    ></button>
+    <div
+      class="relative w-full max-w-[340px] rounded-[14px] border border-line bg-panel p-5 shadow-[0_24px_60px_rgba(0,0,0,.6)]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Delete thread"
+    >
+      <h2 class="text-[14.5px] font-semibold tracking-[-0.01em]">Delete this thread?</h2>
+      <p class="mt-[6px] text-[12.5px] text-ink-2">
+        <b class="font-semibold text-ink">{target.name}</b> and all of its messages, activity and documents
+        will be permanently removed. This cannot be undone.
+      </p>
+      <div class="mt-[18px] flex justify-end gap-2">
+        <button
+          class="rounded-lg border border-line px-[14px] py-[7px] text-[12.5px] text-ink-2 hover:bg-panel-2 hover:text-ink"
+          onclick={() => (pending = null)}
+        >
+          Cancel
+        </button>
+        <button
+          class="rounded-lg border border-clay bg-clay px-[14px] py-[7px] text-[12.5px] font-semibold text-[#17110f] hover:brightness-110"
+          onclick={confirmDelete}
+          {@attach (node: HTMLButtonElement) => node.focus()}
+        >
+          Delete thread
+        </button>
+      </div>
+    </div>
   </div>
 {/if}
