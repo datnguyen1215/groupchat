@@ -25,3 +25,9 @@
 | 10201 | Postgres (Docker) |
 | 10202 | Test server (Playwright) |
 | 10203 | Preview server (`npm run preview`) |
+
+## Reports
+
+- Report what changed and that it passed. Nothing else.
+- No "design calls", "worth flagging", or "notes" sections.
+- Fixed is fixed. Do not report failures you already fixed.
