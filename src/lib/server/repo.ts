@@ -262,6 +262,9 @@ export const renameThread = async (id: string, name: string) => {
 /** Cascades take care of the thread's documents, entries and steps. */
 export const deleteThread = async (id: string) => {
   await db.delete(threads).where(eq(threads.id, id));
+  publish({ scope: 'threads' });
+  /** Anyone still viewing it needs to find out the thread is gone. */
+  publish({ scope: 'thread', threadId: id });
 };
 
 export const getThread = async (id: string) => {

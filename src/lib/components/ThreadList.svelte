@@ -80,9 +80,12 @@
     if (!target) return;
     const res = await fetch(`/api/threads/${target.id}`, { method: 'DELETE' });
     if (!res.ok) return;
-    /* Leave the thread first — its route would 404 once the row is gone. */
-    if (page.params.id === target.id) await goto('/');
-    await invalidateAll();
+    /* Leave the thread first — its route would 404 once the row is gone. The
+       live event for the delete also invalidates, and racing it against the
+       navigation would re-run the dead route's load, so the goto carries the
+       invalidation rather than following it. */
+    if (page.params.id === target.id) await goto('/', { invalidateAll: true });
+    else await invalidateAll();
   };
 </script>
 

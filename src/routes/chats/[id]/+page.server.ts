@@ -10,11 +10,21 @@ import {
 } from '$lib/server/repo';
 import { startTurn } from '$lib/server/ai/loop';
 
-export const load = async ({ params, depends }) => {
+export const load = async ({ params, depends, isDataRequest }) => {
 	depends(`live:thread:${params.id}`);
 
 	const thread = await getThread(params.id);
-	if (!thread) error(404, 'Thread not found');
+	/**
+	 * A thread that vanishes under a reader is not the same as a URL that was
+	 * never valid. Deleting the open thread publishes a live event, so this load
+	 * re-runs against the row it just removed; erroring there would replace the
+	 * page with a 404 and cancel the navigation the delete already started.
+	 * Redirecting instead lets the client end up somewhere real either way.
+	 */
+	if (!thread) {
+		if (isDataRequest) redirect(307, '/');
+		error(404, 'Thread not found');
+	}
 
 	/** A turn cut short by a restart would otherwise spin here forever. */
 	await clearStaleBusy();

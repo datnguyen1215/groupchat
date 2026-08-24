@@ -55,3 +55,23 @@ test('streams an event when a thread is renamed', async ({ request, playwright, 
   expect(seen).toContain(`data: live:thread:${thread.id}`);
   expect(seen).toContain('data: live:threads');
 });
+
+test('a thread deleted under a reader redirects instead of erroring', async ({ request }) => {
+  const created = await request.post('/api/threads', { data: { name: 'Deleted under a reader' } });
+  const { thread } = await created.json();
+
+  await request.delete(`/api/threads/${thread.id}`);
+
+  /**
+   * The shape a live invalidation uses. Erroring here would cancel the
+   * navigation the delete already started, stranding the reader on a dead route.
+   */
+  const data = await request.get(`/chats/${thread.id}/__data.json`, { maxRedirects: 0 });
+  /** A redirect from a data request is serialised into the payload, not sent as 3xx. */
+  expect(data.status()).toBe(200);
+  expect(await data.json()).toMatchObject({ type: 'redirect', location: '/' });
+
+  /** A URL that was never valid is still a 404. */
+  const direct = await request.get(`/chats/${thread.id}`, { maxRedirects: 0 });
+  expect(direct.status()).toBe(404);
+});
