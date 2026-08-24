@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { Fields, fail, ok, readJson } from '$lib/server/api';
-import { getThread, renameThread } from '$lib/server/repo';
+import { deleteThread, getThread, renameThread } from '$lib/server/repo';
 
 export const GET: RequestHandler = async ({ params }) => {
   const thread = await getThread(params.id);
@@ -18,4 +18,11 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 
   await renameThread(params.id, name!);
   return ok({ thread: await getThread(params.id) });
+};
+
+export const DELETE: RequestHandler = async ({ params }) => {
+  if (!(await getThread(params.id))) fail(404, 'Thread not found');
+
+  await deleteThread(params.id);
+  return ok({ deleted: params.id });
 };
