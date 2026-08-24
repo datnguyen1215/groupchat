@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Delete Thread — UI variations</title>
+    <style>
+      :root {
+        --bg: #0e0e10;
+        --panel: #161619;
+        --panel-2: #1c1c20;
+        --ink: #ececeb;
+        --ink-2: #a1a1a6;
+        --ink-3: #6b6b72;
+        --line: #26262b;
+        --line-2: #1f1f24;
+        --edge: #3a3a42;
+        --accent: #7aa2ff;
+        --run: #e0b055;
+        --danger: #e8785d;
+        --font:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font);
+        font-size: 14px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        padding: 40px 32px 120px;
+      }
+      h1 {
+        font-size: 20px;
+        letter-spacing: -0.02em;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: var(--ink-3);
+        font-size: 13px;
+        margin: 0 0 40px;
+      }
+      section {
+        margin-bottom: 56px;
+      }
+      .head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 4px;
+      }
+      .tag {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 1px 6px;
+      }
+      .tag.rec {
+        color: var(--accent);
+        border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+      }
+      h2 {
+        font-size: 15px;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .note {
+        color: var(--ink-2);
+        font-size: 12.5px;
+        margin: 0 0 16px;
+        max-width: 640px;
+      }
+      .stage {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 24px;
+        align-items: flex-start;
+      }
+      .frame {
+        position: relative;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .caption {
+        font-size: 11px;
+        color: var(--ink-3);
+        margin-top: 8px;
+      }
+
+      /* ---- sidebar replica ---- */
+      .rail {
+        width: 230px;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        min-height: 300px;
+      }
+      .rail-head {
+        display: flex;
+        align-items: center;
+        padding: 15px 15px 10px;
+      }
+      .rail-head b {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .plus {
+        margin-left: auto;
+        height: 22px;
+        width: 22px;
+        border: 0;
+        background: none;
+        color: var(--ink-3);
+        font-size: 15px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .rail-body {
+        padding: 0 8px 12px;
+      }
+      .grp {
+        padding: 12px 10px 5px;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        margin: 0;
+      }
+      .item {
+        display: block;
+        border-radius: 9px;
+        padding: 9px 10px;
+        margin-bottom: 1px;
+        cursor: default;
+        position: relative;
+      }
+      .item:hover {
+        background: var(--line-2);
+      }
+      .item.sel {
+        background: var(--panel-2);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .dot {
+        height: 5px;
+        width: 5px;
+        flex: none;
+        border-radius: 50%;
+        background: var(--line);
+      }
+      .dot.live {
+        background: var(--run);
+        box-shadow: 0 0 0 3px rgba(224, 176, 85, 0.15);
+      }
+      .name {
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: -0.005em;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .badge {
+        margin-left: auto;
+        flex: none;
+        border-radius: 999px;
+        background: rgba(122, 162, 255, 0.13);
+        color: var(--accent);
+        padding: 1px 6px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+      .prev {
+        margin-top: 3px;
+        padding-left: 12px;
+        font-size: 11.5px;
+        color: var(--ink-3);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* ---- context menu ---- */
+      .menu {
+        position: absolute;
+        min-width: 150px;
+        border-radius: 9px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        padding: 4px 0;
+        box-shadow:
+          0 12px 32px rgba(0, 0, 0, 0.55),
+          0 0 0 0.5px rgba(255, 255, 255, 0.04);
+        z-index: 5;
+      }
+      .mi {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        border: 0;
+        background: none;
+        text-align: left;
+        padding: 6px 12px;
+        font-size: 12.5px;
+        color: var(--ink-2);
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .mi:hover {
+        background: var(--panel-2);
+        color: var(--ink);
+      }
+      .mi.danger {
+        color: var(--danger);
+      }
+      .mi.danger:hover {
+        background: rgba(232, 120, 93, 0.12);
+        color: var(--danger);
+      }
+      .mi .k {
+        margin-left: auto;
+        color: var(--ink-3);
+        font-size: 11px;
+      }
+      .msep {
+        height: 1px;
+        background: var(--line);
+        margin: 4px 0;
+      }
+      svg.ic {
+        width: 13px;
+        height: 13px;
+        flex: none;
+      }
+
+      /* ---- dialog stage ---- */
+      .app {
+        width: 620px;
+        height: 340px;
+        display: flex;
+        position: relative;
+      }
+      .main {
+        flex: 1;
+        padding: 15px;
+        background: var(--bg);
+      }
+      .skel {
+        height: 9px;
+        border-radius: 5px;
+        background: var(--line-2);
+        margin-bottom: 9px;
+      }
+      .scrim {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: grid;
+        place-items: center;
+        backdrop-filter: blur(1.5px);
+      }
+      .dlg {
+        width: 340px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+      }
+      .dlg h3 {
+        margin: 0 0 6px;
+        font-size: 14.5px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .dlg p {
+        margin: 0 0 18px;
+        font-size: 12.5px;
+        color: var(--ink-2);
+      }
+      .dlg p b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .acts {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      .btn {
+        border-radius: 8px;
+        padding: 7px 14px;
+        font-size: 12.5px;
+        font-weight: 500;
+        font-family: inherit;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--ink-2);
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: var(--panel-2);
+        color: var(--ink);
+      }
+      .btn.del {
+        background: var(--danger);
+        border-color: var(--danger);
+        color: #17110f;
+        font-weight: 600;
+      }
+      .btn.del:hover {
+        background: #f0866c;
+      }
+      .btn.del-outline {
+        background: transparent;
+        border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+        color: var(--danger);
+      }
+      .btn.del-outline:hover {
+        background: rgba(232, 120, 93, 0.12);
+      }
+      .warn {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        background: rgba(232, 120, 93, 0.13);
+        color: var(--danger);
+        margin-bottom: 12px;
+      }
+
+      /* ---- inline confirm ---- */
+      .inline {
+        border-radius: 9px;
+        padding: 9px 10px;
+        background: rgba(232, 120, 93, 0.1);
+        border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+      }
+      .inline .name {
+        color: var(--ink);
+      }
+      .inline-acts {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .mini {
+        flex: 1;
+        border-radius: 6px;
+        padding: 4px 0;
+        font-size: 11.5px;
+        font-family: inherit;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--ink-2);
+      }
+      .mini.del {
+        background: var(--danger);
+        border-color: var(--danger);
+        color: #17110f;
+        font-weight: 600;
+      }
+
+      /* ---- undo toast ---- */
+      .toast {
+        position: absolute;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 9px 12px;
+        font-size: 12.5px;
+        color: var(--ink-2);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+      }
+      .toast b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .undo {
+        border: 0;
+        background: none;
+        color: var(--accent);
+        font-size: 12.5px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+      }
+
+      /* ---- type-to-confirm ---- */
+      .field {
+        width: 100%;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--ink);
+        padding: 7px 10px;
+        font-size: 12.5px;
+        font-family: inherit;
+        margin-bottom: 16px;
+      }
+      .field::placeholder {
+        color: var(--ink-3);
+      }
+      .lbl {
+        font-size: 11.5px;
+        color: var(--ink-3);
+        margin: 0 0 6px;
+      }
+      .btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* hover-affordance variant */
+      .kebab {
+        margin-left: auto;
+        color: var(--ink-3);
+        font-size: 13px;
+        line-height: 1;
+        padding: 0 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Delete a thread</h1>
+    <p class="sub">
+      Current UI, then four recommended variations. All use the app's real
+      tokens.
+    </p>
+
+    <!-- ============ CURRENT ============ -->
+    <section>
+      <div class="head">
+        <span class="tag">Current</span>
+        <h2>Rename only</h2>
+      </div>
+      <p class="note">
+        Right-click opens a one-item menu. No delete anywhere. Menu has no icons
+        and no separator.
+      </p>
+      <div class="stage">
+        <div>
+          <div class="frame">
+            <div class="rail">
+              <div class="rail-head">
+                <b>Threads</b><button class="plus">+</button>
+              </div>
+              <div class="rail-body">
+                <h3 class="grp">Active</h3>
+                <div class="item sel">
+                  <div class="row">
+                    <i class="dot live"></i
+                    ><span class="name">Pricing page copy</span
+                    ><span class="badge">3</span>
+                  </div>
+                  <div class="prev">Scout: drafted three headline…</div>
+                </div>
+                <div class="item">
+                  <div class="row">
+                    <i class="dot"></i><span class="name">Q3 roadmap</span>
+                  </div>
+                  <div class="prev">You: let's cut the last item</div>
+                </div>
+                <h3 class="grp">Recent</h3>
+                <div class="item">
+                  <div class="row">
+                    <i class="dot"></i
+                    ><span class="name">Onboarding audit</span>
+                  </div>
+                  <div class="prev">Archivist: 12 docs indexed</div>
+                </div>
+              </div>
+              <div class="menu" style="left: 96px; top: 128px">
+                <button class="mi">Rename</button>
+              </div>
+            </div>
+          </div>
+          <p class="caption">Right-click → single "Rename" item.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ A ============ -->
+    <section>
+      <div class="head">
+        <span class="tag rec">Option A — recommended</span>
+        <h2>Context menu + centered confirm dialog</h2>
+      </div>
+      <p class="note">
+        Delete sits below a separator, red, with a trash icon. Confirm dialog
+        names the thread and states what is lost. Cancel is the safe default;
+        the red button is the deliberate action.
+      </p>
+      <div class="stage">
+        <div>
+          <div class="frame">
+            <div class="rail">
+              <div class="rail-head">
+                <b>Threads</b><button class="plus">+</button>
+              </div>
+              <div class="rail-body">
+                <h3 class="grp">Active</h3>
+                <div class="item sel">
+                  <div class="row">
+                    <i class="dot live"></i
+                    ><span class="name">Pricing page copy</span
+                    ><span class="badge">3</span>
+                  </div>
+                  <div class="prev">Scout: drafted three headline…</div>
+                </div>
+                <div class="item">
+                  <div class="row">
+                    <i class="dot"></i><span class="name">Q3 roadmap</span>
+                  </div>
+                  <div class="prev">You: let's cut the last item</div>
+                </div>
+                <h3 class="grp">Recent</h3>
+                <div class="item">
+                  <div class="row">
+                    <i class="dot"></i
+                    ><span class="name">Onboarding audit</span>
+                  </div>
+                  <div class="prev">Archivist: 12 docs indexed</div>
+                </div>
+              </div>
+              <div class="menu" style="left: 96px; top: 128px">
+                <button class="mi">
+                  <svg
+                    class="ic"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                  >
+                    <path
+                      d="M9.5 3.5 12.5 6.5 6 13H3v-3z"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Rename
+                </button>
+                <div class="msep"></div>
+                <button class="mi danger">
+                  <svg
+                    class="ic"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                  >
+                    <path
+                      d="M2.5 4.5h11M6.5 4.5V3h3v1.5M4 4.5l.7 8.2a1 1 0 0 0 1 .8h4.6a1 1 0 0 0 1-.8l.7-8.2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+          <p class="caption">Step 1 — menu, separator, red delete.</p>
+        </div>
+
+        <div>
+          <div class="frame">
+            <div class="app">
+              <div class="rail" style="min-height: 0">
+                <div class="rail-head">
+                  <b>Threads</b><button class="plus">+</button>
+                </div>
+                <div class="rail-body">
+                  <h3 class="grp">Active</h3>
+                  <div class="item sel">
+                    <div class="row">
+                      <i class="dot live"></i
+                      ><span class="name">Pricing page copy</span>
+                    </div>
+                    <div class="prev">Scout: drafted three headline…</div>
+                  </div>
+                  <div class="item">
+                    <div class="row">
+                      <i class="dot"></i><span class="name">Q3 roadmap</span>
+                    </div>
+                    <div class="prev">You: let's cut the last item</div>
+                  </div>
+                </div>
+              </div>
+              <div class="main">
+                <div class="skel" style="width: 60%"></div>
+                <div class="skel" style="width: 85%"></div>
+                <div class="skel" style="width: 40%"></div>
+              </div>
+              <div class="scrim">
+                <div class="dlg">
+                  <h3>Delete this thread?</h3>
+                  <p>
+                    <b>Pricing page copy</b> and its 42 messages will be
+                    permanently removed. This cannot be undone.
+                  </p>
+                  <div class="acts">
+                    <button class="btn">Cancel</button>
+                    <button class="btn del">Delete thread</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="caption">
+            Step 2 — confirm dialog. Esc cancels, Enter deletes.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ B ============ -->
+    <section>
+      <div class="head">
+        <span class="tag">Option B</span>
+        <h2>Icon-led dialog with danger badge</h2>
+      </div>
+      <p class="note">
+        Same flow as A but the dialog leads with a red warning glyph and
+        left-aligned buttons split apart. Heavier — reserve for a genuinely
+        destructive product.
+      </p>
+      <div class="stage">
+        <div>
+          <div class="frame">
+            <div class="app">
+              <div class="rail" style="min-height: 0">
+                <div class="rail-head">
+                  <b>Threads</b><button class="plus">+</button>
+                </div>
+                <div class="rail-body">
+                  <h3 class="grp">Active</h3>
+                  <div class="item sel">
+                    <div class="row">
+                      <i class="dot live"></i
+                      ><span class="name">Pricing page copy</span>
+                    </div>
+                    <div class="prev">Scout: drafted three headline…</div>
+                  </div>
+                </div>
+              </div>
+              <div class="main">
+                <div class="skel" style="width: 60%"></div>
+                <div class="skel" style="width: 85%"></div>
+              </div>
+              <div class="scrim">
+                <div class="dlg">
+                  <div class="warn">
+                    <svg
+                      class="ic"
+                      style="width: 15px; height: 15px"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                    >
+                      <path d="M8 2.8 14.5 13.5h-13z" stroke-linejoin="round" />
+                      <path d="M8 6.6v3M8 11.6v.1" stroke-linecap="round" />
+                    </svg>
+                  </div>
+                  <h3>Delete “Pricing page copy”</h3>
+                  <p>
+                    42 messages, 3 agent runs and 5 linked documents go with it.
+                    There is no undo.
+                  </p>
+                  <div class="acts" style="justify-content: space-between">
+                    <button class="btn">Keep thread</button>
+                    <button class="btn del">Delete</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="caption">Warning glyph, split actions.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ C ============ -->
+    <section>
+      <div class="head">
+        <span class="tag">Option C</span>
+        <h2>Inline confirm in the sidebar</h2>
+      </div>
+      <p class="note">
+        No overlay. The row itself turns into the confirmation, so the thread
+        you are deleting stays under your cursor. Fastest, but the two
+        mini-buttons are small targets.
+      </p>
+      <div class="stage">
+        <div>
+          <div class="frame">
+            <div class="rail">
+              <div class="rail-head">
+                <b>Threads</b><button class="plus">+</button>
+              </div>
+              <div class="rail-body">
+                <h3 class="grp">Active</h3>
+                <div class="item inline">
+                  <div class="row">
+                    <i class="dot live"></i
+                    ><span class="name">Delete “Pricing page copy”?</span>
+                  </div>
+                  <div class="inline-acts">
+                    <button class="mini">Cancel</button>
+                    <button class="mini del">Delete</button>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="row">
+                    <i class="dot"></i><span class="name">Q3 roadmap</span>
+                  </div>
+                  <div class="prev">You: let's cut the last item</div>
+                </div>
+                <h3 class="grp">Recent</h3>
+                <div class="item">
+                  <div class="row">
+                    <i class="dot"></i
+                    ><span class="name">Onboarding audit</span>
+                  </div>
+                  <div class="prev">Archivist: 12 docs indexed</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="caption">The row becomes the dialog.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ D ============ -->
+    <section>
+      <div class="head">
+        <span class="tag">Option D</span>
+        <h2>Delete immediately, offer undo</h2>
+      </div>
+      <p class="note">
+        No confirmation at all. The thread disappears and a toast offers Undo
+        for ~8 seconds. Least friction, but needs soft-delete on the server.
+      </p>
+      <div class="stage">
+        <div>
+          <div class="frame">
+            <div class="app">
+              <div class="rail" style="min-height: 0">
+                <div class="rail-head">
+                  <b>Threads</b><button class="plus">+</button>
+                </div>
+                <div class="rail-body">
+                  <h3 class="grp">Active</h3>
+                  <div class="item sel">
+                    <div class="row">
+                      <i class="dot"></i><span class="name">Q3 roadmap</span>
+                    </div>
+                    <div class="prev">You: let's cut the last item</div>
+                  </div>
+                  <h3 class="grp">Recent</h3>
+                  <div class="item">
+                    <div class="row">
+                      <i class="dot"></i
+                      ><span class="name">Onboarding audit</span>
+                    </div>
+                    <div class="prev">Archivist: 12 docs indexed</div>
+                  </div>
+                </div>
+              </div>
+              <div class="main">
+                <div class="skel" style="width: 60%"></div>
+                <div class="skel" style="width: 85%"></div>
+                <div class="skel" style="width: 40%"></div>
+              </div>
+              <div class="toast">
+                <span>Deleted <b>Pricing page copy</b></span>
+                <button class="undo">Undo</button>
+              </div>
+            </div>
+          </div>
+          <p class="caption">Gone instantly, recoverable for 8s.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ E ============ -->
+    <section>
+      <div class="head">
+        <span class="tag">Option E</span>
+        <h2>Type-to-confirm</h2>
+      </div>
+      <p class="note">
+        The delete button stays disabled until the thread name is typed. Correct
+        for irreversible org-level deletes; overkill for a chat thread.
+      </p>
+      <div class="stage">
+        <div>
+          <div class="frame">
+            <div class="app">
+              <div class="rail" style="min-height: 0">
+                <div class="rail-head">
+                  <b>Threads</b><button class="plus">+</button>
+                </div>
+                <div class="rail-body">
+                  <h3 class="grp">Active</h3>
+                  <div class="item sel">
+                    <div class="row">
+                      <i class="dot live"></i
+                      ><span class="name">Pricing page copy</span>
+                    </div>
+                    <div class="prev">Scout: drafted three headline…</div>
+                  </div>
+                </div>
+              </div>
+              <div class="main">
+                <div class="skel" style="width: 60%"></div>
+                <div class="skel" style="width: 85%"></div>
+              </div>
+              <div class="scrim">
+                <div class="dlg">
+                  <h3>Delete this thread?</h3>
+                  <p>
+                    This permanently removes the thread and all of its history.
+                  </p>
+                  <p class="lbl">Type <b>Pricing page copy</b> to confirm.</p>
+                  <input class="field" placeholder="Pricing page copy" />
+                  <div class="acts">
+                    <button class="btn">Cancel</button>
+                    <button class="btn del-outline" disabled>
+                      Delete thread
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="caption">Button enables only on an exact match.</p>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
