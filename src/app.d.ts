@@ -7,7 +7,10 @@ declare global {
       /** Per-field problems from a 422; absent on every other status. */
       invalid?: { field: string; message: string }[];
     }
-    // interface Locals {}
+    interface Locals {
+      user: import('better-auth').User | null;
+      session: import('better-auth').Session | null;
+    }
     // interface PageData {}
     // interface PageState {}
     // interface Platform {}

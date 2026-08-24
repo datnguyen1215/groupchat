@@ -48,6 +48,7 @@
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.31",
     "ai": "^7.0.77",
+    "better-auth": "^1.7.1",
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.9"
   }

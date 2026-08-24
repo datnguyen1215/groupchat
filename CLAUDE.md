@@ -33,13 +33,13 @@
 - Never use a framework default (5173, 4173, 5432). Never pick a port below 10200.
 - New service? Take the next free port and add it to the table.
 
-| Port  | Service                            |
-| ----- | ---------------------------------- |
-| 10200 | Dev server (`npm run dev`)         |
-| 10201 | Postgres (Docker)                  |
-| 10202 | Test server (Playwright)           |
-| 10203 | Preview server (`npm run preview`) |
+| Port  | Service                                  |
+| ----- | ---------------------------------------- |
+| 10200 | Dev server (`npm run dev`)               |
+| 10201 | Postgres (Docker)                        |
+| 10203 | Preview server (`npm run preview`)       |
 | 10204 | UI mockup server (`ui-variations` skill) |
+| 10302 | Test server (Playwright)                 |
 
 ## Reports
 

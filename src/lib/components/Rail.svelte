@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { threads } from '$lib/data/threads';
   import { you } from '$lib/data/agents';
+  import { signOut } from '$lib/auth-client';
   import Avatar from './Avatar.svelte';
 
   /* The divider encodes scope: Chats is thread-scoped, everything below is global. */
@@ -16,6 +18,18 @@
   ];
 
   const isActive = (match: string) => page.url.pathname.startsWith(match);
+
+  /* No name field at signup, so the address is the only label we have. */
+  const email = $derived(page.data.user?.email ?? '');
+  const initials = $derived(email.slice(0, 2).toUpperCase() || you.initials);
+
+  let menuOpen = $state(false);
+
+  const handleSignOut = async () => {
+    menuOpen = false;
+    await signOut();
+    await goto('/login', { invalidateAll: true });
+  };
 </script>
 
 {#snippet railLink(item: { href: string; match: string; glyph: string; label: string })}
@@ -48,5 +62,40 @@
   {/each}
 
   <div class="flex-1"></div>
-  <Avatar initials={you.initials} color={you.color} size="md" shape="circle" />
+
+  <div class="relative">
+    <button
+      type="button"
+      title={email}
+      aria-label="Account"
+      aria-expanded={menuOpen}
+      onclick={() => (menuOpen = !menuOpen)}
+    >
+      <Avatar {initials} color={you.color} size="md" shape="circle" />
+    </button>
+
+    {#if menuOpen}
+      <!-- Click-away sits behind the menu so the menu itself stays clickable. -->
+      <button
+        type="button"
+        class="fixed inset-0 z-10 cursor-default"
+        aria-label="Close account menu"
+        onclick={() => (menuOpen = false)}
+      ></button>
+
+      <div
+        class="absolute bottom-0 left-[calc(100%+8px)] z-20 min-w-[180px] rounded-[9px] border border-line bg-panel py-1 shadow-[0_12px_32px_rgba(0,0,0,0.55)]"
+      >
+        <p class="truncate px-3 py-[6px] text-[11.5px] text-ink-3">{email}</p>
+        <div class="my-1 h-px bg-line"></div>
+        <button
+          type="button"
+          class="w-full px-3 py-[6px] text-left text-[12.5px] text-clay hover:bg-clay/12"
+          onclick={handleSignOut}
+        >
+          Sign out
+        </button>
+      </div>
+    {/if}
+  </div>
 </nav>

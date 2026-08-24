@@ -50,3 +50,47 @@ body {
 .on-panel ::-webkit-scrollbar-thumb {
   border-color: var(--color-panel);
 }
+
+/* Auth forms. Three fields repeated across two pages; the shapes must match. */
+.auth-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+}
+
+.auth-input {
+  width: 100%;
+  margin-bottom: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 9px;
+  background: var(--color-panel-2);
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--color-ink);
+}
+.auth-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  box-shadow: 0 0 0 3px rgb(122 162 255 / 0.12);
+}
+.auth-input-error {
+  border-color: color-mix(in srgb, var(--color-clay) 60%, transparent);
+}
+
+.auth-submit {
+  width: 100%;
+  border-radius: 9px;
+  background: var(--color-accent);
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-bg);
+  cursor: pointer;
+}
+.auth-submit:hover {
+  background: color-mix(in srgb, var(--color-accent) 88%, white);
+}

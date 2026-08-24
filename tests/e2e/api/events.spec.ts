@@ -1,4 +1,14 @@
 import { expect, test } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { STORAGE_STATE } from '../../support/auth';
+
+/** The saved signed-in state, flattened into a Cookie header. */
+const sessionCookieHeader = () => {
+  const state = JSON.parse(readFileSync(STORAGE_STATE, 'utf8')) as {
+    cookies: { name: string; value: string }[];
+  };
+  return state.cookies.map(c => `${c.name}=${c.value}`).join('; ');
+};
 
 /**
  * The live stream, end to end: a write on one request has to reach a stream
@@ -35,12 +45,15 @@ test('streams an event when a thread is renamed', async ({ request, playwright, 
   expect(created.ok()).toBeTruthy();
   const { thread } = await created.json();
 
+  /* Raw fetch carries no storage state, so the session cookie is passed by hand. */
+  const cookies = sessionCookieHeader();
+
   /**
    * Fetched outside Playwright's request fixture: that fixture buffers a
    * response to completion, and this one never completes.
    */
   const stream = await fetch(new URL('/api/events', baseURL).href, {
-    headers: { accept: 'text/event-stream' }
+    headers: { accept: 'text/event-stream', cookie: cookies }
   });
   expect(stream.status).toBe(200);
   expect(stream.headers.get('content-type')).toContain('text/event-stream');

@@ -16,3 +16,14 @@ export const ready = async (page: Page, path: string) => {
 
 /** The scrim also carries `aria-label="Close"`, so modal lookups scope to the dialog. */
 export const dialog = (page: Page) => page.getByRole('dialog');
+
+/**
+ * The signed-out pages have no rail, so `ready` cannot wait on it. The submit
+ * button is the equivalent signal: the form is inert until Svelte attaches to it.
+ */
+export const readyForm = async (page: Page, path: string) => {
+  await page.goto(path);
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('form button[type="submit"]')).toBeVisible();
+  await page.waitForTimeout(250);
+};

@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import { STORAGE_STATE } from './tests/support/auth';
 
-const PORT = Number(process.env.TEST_PORT || 10202);
+const PORT = Number(process.env.TEST_PORT || 10302);
 
 /**
  * API and UI tests run against a real dev server pointed at the `test` Postgres
@@ -20,10 +21,33 @@ export default defineConfig({
     trace: 'retain-on-failure'
   },
   projects: [
-    { name: 'api', testMatch: /api\/.*\.spec\.ts/ },
+    /* Signs the shared account in once; every other project reuses its cookie. */
+    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    {
+      name: 'api',
+      testMatch: /e2e\/api\/.*\.spec\.ts/,
+      dependencies: ['setup'],
+      use: { storageState: STORAGE_STATE }
+    },
     {
       name: 'ui',
-      testMatch: /ui\/.*\.spec\.ts/,
+      testMatch: /e2e\/ui\/.*\.spec\.ts/,
+      dependencies: ['setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        storageState: STORAGE_STATE
+      }
+    },
+    /**
+     * The auth flows themselves must start signed out, so this project opts out
+     * of the shared cookie instead of inheriting it.
+     */
+    {
+      name: 'auth',
+      testMatch: /e2e\/auth\/.*\.spec\.ts/,
+      /* Depends on setup for the shared account, but deliberately not its cookie. */
+      dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } }
     }
   ],
@@ -32,7 +56,10 @@ export default defineConfig({
     port: PORT,
     reuseExistingServer: false,
     env: {
-      DATABASE_SCHEMA: process.env.DATABASE_SCHEMA || 'test'
+      DATABASE_SCHEMA: process.env.DATABASE_SCHEMA || 'test',
+      /* Sessions must survive the run; a missing secret makes better-auth throw. */
+      BETTER_AUTH_SECRET:
+        process.env.BETTER_AUTH_SECRET || 'kJ8pQx2vN7mR4tY6wZ1aB5cD9eF3gH0iL2nO4pS6uV8='
     }
   }
 });
