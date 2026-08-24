@@ -27,6 +27,12 @@ export type ToolContext = {
 	tag: string;
 };
 
+/** Thread-only by default: an agent sees its own thread unless it asks wider. */
+const scopeSchema = z
+	.enum(['thread', 'all'])
+	.optional()
+	.describe('"thread" (default) for this thread only, "all" for every thread.');
+
 /** A window of body text around the first match, so search results are skimmable. */
 export const excerpt = (body: string, needle: string) => {
 	const at = body.toLowerCase().indexOf(needle);
@@ -66,11 +72,20 @@ const readTools = (ctx: ToolContext) => ({
 	}),
 
 	list_documents: tool({
-		description: 'List the documents in this thread.',
-		inputSchema: z.object({}),
-		execute: async () => {
-			const all = await listDocuments(ctx.threadId);
-			return all.map((d) => ({ id: d.id, name: d.name, author: d.author }));
+		description:
+			'List documents. Defaults to this thread; pass scope "all" to see documents ' +
+			'from every thread, which is how you find prior work to build on.',
+		inputSchema: z.object({
+			scope: scopeSchema
+		}),
+		execute: async ({ scope }) => {
+			const all = await listDocuments(scope === 'all' ? undefined : ctx.threadId);
+			return all.map((d) => ({
+				id: d.id,
+				name: d.name,
+				author: d.author,
+				threadName: d.threadName
+			}));
 		}
 	}),
 
@@ -86,20 +101,23 @@ const readTools = (ctx: ToolContext) => ({
 
 	search_documents: tool({
 		description:
-			'Find documents in this thread whose name or body contains some text. ' +
+			'Find documents whose name or body contains some text. Defaults to this thread; ' +
+			'pass scope "all" to search every thread. ' +
 			'Use this before writing a new document, to check whether one already exists.',
 		inputSchema: z.object({
-			query: z.string().describe('The text to look for. Case-insensitive.')
+			query: z.string().describe('The text to look for. Case-insensitive.'),
+			scope: scopeSchema
 		}),
-		execute: async ({ query }) => {
+		execute: async ({ query, scope }) => {
 			const needle = query.trim().toLowerCase();
 			if (!needle) return [];
-			const all = await listDocuments(ctx.threadId);
+			const all = await listDocuments(scope === 'all' ? undefined : ctx.threadId);
 			const hits = all.filter((d) => `${d.name} ${d.body}`.toLowerCase().includes(needle));
 			return hits.map((d) => ({
 				id: d.id,
 				name: d.name,
 				author: d.author,
+				threadName: d.threadName,
 				excerpt: excerpt(d.body, needle)
 			}));
 		}
