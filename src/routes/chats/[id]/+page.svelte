@@ -4,14 +4,13 @@
 	import Conversation from '$lib/components/Conversation.svelte';
 	import DocsSidebar from '$lib/components/DocsSidebar.svelte';
 	import ThreadList from '$lib/components/ThreadList.svelte';
-	import { documents } from '$lib/data/documents';
 	import { stepCount } from '$lib/data/threads';
 
 	const { data } = $props();
 
 	const thread = $derived(data.thread);
 	const steps = $derived(stepCount(thread));
-	const threadDocs = $derived(documents.filter((doc) => thread.docIds.includes(doc.id)));
+	const threadDocs = $derived(data.documents.filter((doc) => thread.docIds.includes(doc.id)));
 
 	let activityOpen = $state(false);
 	let docsOpen = $state(false);

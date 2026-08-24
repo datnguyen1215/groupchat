@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { findSkill } from '$lib/data/skills';
+	import { page } from '$app/state';
+	import type { Skill } from '$lib/data/skills';
 	import { overlay } from '$lib/state/overlay.svelte';
 	import Markdown from './Markdown.svelte';
 	import Modal from './Modal.svelte';
 
-	const skill = $derived(overlay.skillId ? findSkill(overlay.skillId) : undefined);
+	const skill = $derived((page.data.skills as Skill[]).find((s) => s.id === overlay.skillId));
 
 	let tab = $state<'about' | 'used-by'>('about');
 

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import AgentCard from '$lib/components/AgentCard.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { orchestrator, researchAgents, spawnedAgents } from '$lib/data/agents';
+
+	const { data } = $props();
+	const { orchestrator, researchAgents, spawnedAgents } = $derived(data);
 </script>
 
 <svelte:head><title>Agents · Group Chat</title></svelte:head>
@@ -20,9 +22,11 @@
 		</PageHeader>
 
 		<h2 class="mb-[11px] text-[10px] font-semibold tracking-[0.08em] text-ink-3 uppercase">Orchestrator</h2>
-		<div class="mb-[26px] grid grid-cols-1 gap-[11px]">
-			<AgentCard agent={orchestrator} orchestrator />
-		</div>
+		{#if orchestrator}
+			<div class="mb-[26px] grid grid-cols-1 gap-[11px]">
+				<AgentCard agent={orchestrator} orchestrator />
+			</div>
+		{/if}
 
 		<h2 class="mb-[11px] text-[10px] font-semibold tracking-[0.08em] text-ink-3 uppercase">Research agents</h2>
 		<div class="mb-[26px] grid grid-cols-[repeat(auto-fill,minmax(310px,1fr))] gap-[11px]">

@@ -19,10 +19,10 @@ const create = async (request: APIRequestContext, overrides: Record<string, unkn
 test.describe('GET /api/documents', () => {
 	test('expands the author FK and joins the thread name', async ({ request }) => {
 		const { documents } = await (await request.get('/api/documents')).json();
-		const doc = documents.find((d: { id: string }) => d.id === 'eval-protocol');
+		const doc = documents.find((d: { id: string }) => d.id === 'eval-protocol-v1');
 
 		expect(doc).toMatchObject({
-			name: 'eval-protocol.md',
+			name: 'eval-protocol-v1.md',
 			threadName: 'Retrieval eval design',
 			author: 'Kestrel',
 			authorInitials: 'K',

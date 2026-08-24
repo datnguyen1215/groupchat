@@ -1,6 +1,7 @@
 <script lang="ts">
+	import type { Doc } from '$lib/data/documents';
 	import type { Entry } from '$lib/data/threads';
-	import { findDoc } from '$lib/data/documents';
+	import { page } from '$app/state';
 	import { overlay } from '$lib/state/overlay.svelte';
 	import Avatar from './Avatar.svelte';
 	import Icon from './Icon.svelte';
@@ -52,7 +53,7 @@
 						{/each}
 
 						{#if entry.docId}
-							{@const doc = findDoc(entry.docId)}
+							{@const doc = (page.data.documents as Doc[]).find((d) => d.id === entry.docId)}
 							{#if doc}
 								<button
 									class="mt-2 inline-flex cursor-pointer items-center gap-[7px] rounded-lg border border-line bg-panel py-[6px] pr-[11px] pl-[9px] text-[12.5px] hover:border-edge hover:bg-panel-2"

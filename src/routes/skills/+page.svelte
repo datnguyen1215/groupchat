@@ -2,21 +2,23 @@
 	import Avatar from '$lib/components/Avatar.svelte';
 	import FilterBar from '$lib/components/FilterBar.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { skills } from '$lib/data/skills';
 	import { overlay } from '$lib/state/overlay.svelte';
+
+	const { data } = $props();
+	const skills = $derived(data.skills);
 
 	let query = $state('');
 	let active = $state('all');
 
-	const mine = skills.filter((s) => s.authoredBy === 'you').length;
-	const byAgents = skills.filter((s) => s.authoredBy === 'agent').length;
+	const mine = $derived(skills.filter((s) => s.authoredBy === 'you').length);
+	const byAgents = $derived(skills.filter((s) => s.authoredBy === 'agent').length);
 
-	const filters = [
+	const filters = $derived([
 		{ id: 'all', label: `All ${skills.length}` },
 		{ id: 'mine', label: `Mine ${mine}` },
 		{ id: 'agent', label: `Agent-authored ${byAgents}` },
 		{ id: 'recent', label: 'Recently used' }
-	];
+	]);
 
 	const matchesFilter = (skill: (typeof skills)[number]) => {
 		if (active === 'mine') return skill.authoredBy === 'you';

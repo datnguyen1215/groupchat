@@ -92,10 +92,13 @@ const threadNameIndex = async (ids: string[]) => {
 
 /**
  * Stats were fixture literals (`'89 messages'`). Counted for real where the data
- * supports it; the ephemeral agents' `wall clock` had no source and is dropped.
+ * supports it: `messages` and `docs` are queried, `instances` is a column on
+ * spawned agents. The fixtures' `tool calls` and `wall clock` had no backing
+ * table and are dropped.
  */
-const statsIndex = async (ids: string[]) => {
+const statsIndex = async (rows: (typeof agents.$inferSelect)[]) => {
 	const index = new Map<string, Stat[]>();
+	const ids = rows.map((r) => r.id);
 	if (!ids.length) return index;
 
 	const [messages, docs] = await Promise.all([
@@ -116,10 +119,14 @@ const statsIndex = async (ids: string[]) => {
 	const m = byId(messages);
 	const d = byId(docs);
 
-	for (const id of ids)
-		index.set(id, [
-			{ value: String(m.get(id) ?? 0), label: 'messages' },
-			{ value: String(d.get(id) ?? 0), label: 'docs' }
+	for (const row of rows)
+		index.set(row.id, [
+			{ value: String(m.get(row.id) ?? 0), label: 'messages' },
+			{ value: String(d.get(row.id) ?? 0), label: 'docs' },
+			/* Spawned agents run in parallel; the count is the point of the card. */
+			...(row.kind === 'spawned'
+				? [{ value: String(row.instances), label: 'instances' }]
+				: [])
 		]);
 	return index;
 };
@@ -138,7 +145,7 @@ const agentSkillIndex = async (ids: string[]) => {
 
 const decorate = async (rows: (typeof agents.$inferSelect)[]) => {
 	const ids = rows.map((r) => r.id);
-	const [skillsBy, stats] = await Promise.all([agentSkillIndex(ids), statsIndex(ids)]);
+	const [skillsBy, stats] = await Promise.all([agentSkillIndex(ids), statsIndex(rows)]);
 	return rows.map((r) => agentDto(r, skillsBy.get(r.id) ?? [], stats.get(r.id) ?? []));
 };
 

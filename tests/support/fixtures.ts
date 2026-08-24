@@ -7,9 +7,26 @@ import type { Sql } from 'postgres';
  */
 export const BASE = {
 	agents: [
-		{ id: 'orchestrator', name: 'Orchestrator', initials: 'O', color: '#7aa2ff', kind: 'orchestrator' },
+		{
+			id: 'orchestrator',
+			name: 'Orchestrator',
+			initials: 'O',
+			color: '#7aa2ff',
+			kind: 'orchestrator',
+			role: 'Routes work · never answers directly'
+		},
 		{ id: 'kestrel', name: 'Kestrel', initials: 'K', color: '#4ec98a', kind: 'research' },
 		{ id: 'wren', name: 'Wren', initials: 'W', color: '#e8785d', kind: 'research' },
+		/* The Agents page renders spawned agents in their own section, with an instance count. */
+		{
+			id: 'paper-reader-x3',
+			name: 'paper-reader ×3',
+			initials: 'R',
+			color: '#2e2e35',
+			kind: 'spawned',
+			instances: 3,
+			spawnedBy: 'Wren'
+		},
 		{ id: 'you', name: 'You', initials: 'DN', color: '#5b5b66', kind: 'you' }
 	],
 	threads: [
@@ -40,12 +57,26 @@ export const BASE = {
 	],
 	documents: [
 		{
-			id: 'eval-protocol',
-			name: 'eval-protocol.md',
+			/* Id matches the fixture thread's `docIds`, so the chat docs lane resolves it. */
+			id: 'eval-protocol-v1',
+			name: 'eval-protocol-v1.md',
 			threadId: 'retrieval-eval',
 			authorId: 'kestrel',
 			version: 1,
-			body: '# Protocol\n\nSome body text.'
+			/* Heading, table and code fence: the modal must render each as a real element. */
+			body: [
+				'# Protocol',
+				'',
+				'Some body text.',
+				'',
+				'| Grade | Meaning |',
+				'| --- | --- |',
+				'| 3 | Directly answers |',
+				'',
+				'```',
+				'eval = Harness(corpus="domain-v4")',
+				'```'
+			].join('\n')
 		}
 	],
 	/** Kestrel uses eval-harness; drives the `usedBy` join assertions. */
@@ -55,8 +86,17 @@ export const BASE = {
 export const seedBase = async (sql: Sql) => {
 	await sql`truncate table steps, entries, agent_skills, documents, skills, threads, agents restart identity cascade`;
 
-	for (const a of BASE.agents)
-		await sql`insert into agents ${sql({ ...a, role: '', description: '', status: 'idle', status_label: 'Idle' } as never)}`;
+	for (const a of BASE.agents) {
+		const { spawnedBy, ...rest } = a as typeof a & { spawnedBy?: string };
+		await sql`insert into agents ${sql({
+			role: '',
+			description: '',
+			status: 'idle',
+			status_label: 'Idle',
+			...rest,
+			spawned_by: spawnedBy ?? null
+		} as never)}`;
+	}
 
 	for (const t of BASE.threads) await sql`insert into threads ${sql(t as never)}`;
 

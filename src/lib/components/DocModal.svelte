@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { findDoc } from '$lib/data/documents';
+	import { page } from '$app/state';
+	import type { Doc } from '$lib/data/documents';
 	import { overlay } from '$lib/state/overlay.svelte';
 	import Markdown from './Markdown.svelte';
 	import Modal from './Modal.svelte';
 
-	const doc = $derived(overlay.docId ? findDoc(overlay.docId) : undefined);
+	const doc = $derived((page.data.documents as Doc[]).find((d) => d.id === overlay.docId));
 </script>
 
 {#if doc}

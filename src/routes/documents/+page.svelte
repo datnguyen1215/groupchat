@@ -2,21 +2,24 @@
 	import Avatar from '$lib/components/Avatar.svelte';
 	import FilterBar from '$lib/components/FilterBar.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { documents } from '$lib/data/documents';
+	/* Threads are still fixtures — no thread API exists yet. */
 	import { threads } from '$lib/data/threads';
 	import { overlay } from '$lib/state/overlay.svelte';
 
+	const { data } = $props();
+	const documents = $derived(data.documents);
+
 	const currentThread = threads[0];
-	const inThread = documents.filter((doc) => doc.threadId === currentThread.id).length;
+	const inThread = $derived(documents.filter((doc) => doc.threadId === currentThread.id).length);
 
 	let query = $state('');
 	let active = $state('all');
 
-	const filters = [
+	const filters = $derived([
 		{ id: 'all', label: `All ${documents.length}` },
 		{ id: 'thread', label: `This thread ${inThread}` },
 		{ id: 'recent', label: 'Recent' }
-	];
+	]);
 
 	const matchesFilter = (doc: (typeof documents)[number]) => {
 		if (active === 'thread') return doc.threadId === currentThread.id;
