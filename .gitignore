@@ -31,3 +31,8 @@ vite.config.ts.timestamp-*
 .svelte-kit/
 build/
 .playwright-mcp/
+
+# Tests
+/test-results
+/playwright-report
+/blob-report

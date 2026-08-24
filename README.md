@@ -27,6 +27,18 @@ dev machine. Change `POSTGRES_PORT` and `DATABASE_URL` in `.env` together.
 | `db:seed` | Truncate and reload the fixtures. Idempotent |
 | `db:studio` | Drizzle Studio, a browser UI over the tables |
 
+## Tests
+
+```sh
+npm test           # 31 unit + 81 end-to-end
+npm run test:unit  # vitest
+npm run test:api   # playwright, HTTP against a real server
+npm run test:ui    # playwright, Chromium
+```
+
+Tests run against a dedicated `test` Postgres schema and never touch your
+development data. See `docs/testing.md`.
+
 ## Shell
 
 Implements `mockups/b-focus-column.html` (see `handoffs/` for the design review).
@@ -68,6 +80,8 @@ src/lib/
   markdown.ts   parser for the fixture markdown subset
 drizzle/        generated SQL migrations
 scripts/seed.ts fixtures to database, one shot
+tests/          unit, api, ui — see docs/testing.md
+docs/           api.md, testing.md
 ```
 
 ## Data model
@@ -87,10 +101,17 @@ Presentation fields the fixtures denormalized (`initials`, `color`,
 derives from the body length and `updated` is a real `timestamptz` rather than
 the string `'Yesterday'`.
 
+## API
+
+REST routes for **agents**, **skills**, and **documents** under `/api`. Full
+reference in `docs/api.md`. Threads and chat have no endpoints yet.
+
 ## Not built
 
-The frontend still reads `src/lib/data/` directly; nothing queries the database
-yet. REST routes and the frontend rewiring are the next step.
+**The frontend still reads `src/lib/data/` directly** — the pages do not call the
+API. Rewiring them is the next step, and it means dropping the fixtures as a
+runtime source and choosing per route between `+page.server.ts` load and client
+fetching.
 
 Also stubbed, matching the mockup's scope: skill and agent create/edit, thread
 creation, composer `@ agent` / `◈ skill` pickers, global search, `⌘K`.
