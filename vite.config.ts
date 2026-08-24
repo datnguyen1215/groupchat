@@ -4,6 +4,9 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	// Ports are pinned in the 10200+ range; see CLAUDE.md.
+	server: { port: 10200, strictPort: true },
+	preview: { port: 10203, strictPort: true },
 	plugins: [
 		tailwindcss(),
 		sveltekit({

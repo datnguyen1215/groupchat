@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const PORT = Number(process.env.TEST_PORT || 5180);
+const PORT = Number(process.env.TEST_PORT || 10202);
 
 /**
  * API and UI tests run against a real dev server pointed at the `test` Postgres

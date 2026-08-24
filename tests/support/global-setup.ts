@@ -7,8 +7,8 @@ import { seedBase } from './fixtures';
  * run and before the dev server starts serving.
  */
 export default async () => {
+	// `.env` is optional — every reader falls back to the compose defaults.
 	config({ path: '.env', quiet: true });
-	if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set — copy .env.example');
 
 	await resetSchema();
 

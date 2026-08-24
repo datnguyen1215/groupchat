@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import postgres from 'postgres';
+import { databaseUrl } from '../../src/lib/server/db/url';
 
 /**
  * Test data lives in its own Postgres schema, never `public`. Tests can then run
@@ -9,7 +10,7 @@ import postgres from 'postgres';
 export const TEST_SCHEMA = process.env.DATABASE_SCHEMA || 'test';
 
 export const connect = (schema = TEST_SCHEMA) =>
-	postgres(process.env.DATABASE_URL!, { connection: { search_path: schema }, max: 4 });
+	postgres(databaseUrl(process.env.DATABASE_URL), { connection: { search_path: schema }, max: 4 });
 
 const migrationsDir = resolve(process.cwd(), 'drizzle');
 
@@ -18,7 +19,7 @@ const migrationsDir = resolve(process.cwd(), 'drizzle');
  * are schema-qualified only by `search_path`, so the same SQL builds any schema.
  */
 export const resetSchema = async (schema = TEST_SCHEMA) => {
-	const root = postgres(process.env.DATABASE_URL!, { max: 1 });
+	const root = postgres(databaseUrl(process.env.DATABASE_URL), { max: 1 });
 	try {
 		await root.unsafe(`drop schema if exists "${schema}" cascade`);
 		await root.unsafe(`create schema "${schema}"`);

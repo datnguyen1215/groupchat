@@ -10,11 +10,9 @@ import { orchestrator, researchAgents, spawnedAgents, you } from '../src/lib/dat
 import { skills as skillFixtures } from '../src/lib/data/skills';
 import { documents as docFixtures } from '../src/lib/data/documents';
 import { threads as threadFixtures } from '../src/lib/data/threads';
+import { databaseUrl } from '../src/lib/server/db/url';
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error('DATABASE_URL is not set');
-
-const client = postgres(url);
+const client = postgres(databaseUrl(process.env.DATABASE_URL));
 const db = drizzle(client, { schema: s });
 
 /** Fixtures reference agents by display name; the DB references them by id. */

@@ -9,15 +9,28 @@ Postgres runs in Docker; the app runs on the host.
 
 ```sh
 npm install
-cp .env.example .env
-npm run db:up        # Postgres 17 on 127.0.0.1:10102
-npm run db:migrate   # apply drizzle/ migrations
-npm run db:seed      # load src/lib/data/ fixtures into the database
-npm run dev
+npm run db:up         # Postgres 17 on 127.0.0.1:10201
+npm run db:migrate    # apply drizzle/ migrations
+npm run db:seed       # load src/lib/data/ fixtures into the database
+npm run dev           # http://localhost:10200
 ```
 
-Port 10102 rather than 5432 because a native Postgres already holds 5432 on the
-dev machine. Change `POSTGRES_PORT` and `DATABASE_URL` in `.env` together.
+## Ports
+
+Every service runs in the **10200+** range — no framework defaults. See
+`CLAUDE.md`.
+
+| Port | Service |
+| --- | --- |
+| 10200 | Dev server |
+| 10201 | Postgres (Docker) |
+| 10202 | Test server (Playwright) |
+| 10203 | Preview server |
+
+`.env` is optional — the defaults above are compiled in
+(`src/lib/server/db/url.ts` and `docker-compose.yml`). To override, copy
+`.env.example` to `.env` and change `POSTGRES_PORT` and `DATABASE_URL`
+together.
 
 | Script | What |
 | --- | --- |

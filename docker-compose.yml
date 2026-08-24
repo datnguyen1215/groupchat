@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-groupchat}
       POSTGRES_DB: ${POSTGRES_DB:-groupchat}
     ports:
-      - '127.0.0.1:${POSTGRES_PORT:-10102}:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-10201}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
