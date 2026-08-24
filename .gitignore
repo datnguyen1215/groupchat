@@ -26,3 +26,8 @@ vite.config.ts.timestamp-*
 
 # Editor
 .vscode/
+
+# SvelteKit
+.svelte-kit/
+build/
+.playwright-mcp/
