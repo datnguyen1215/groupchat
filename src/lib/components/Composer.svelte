@@ -23,7 +23,9 @@
 	}}
 	class="flex-none px-6 pt-2 pb-5"
 >
-	<div class="mx-auto max-w-[620px] rounded-[13px] border border-line bg-panel px-[14px] py-3 focus-within:border-edge">
+	<div
+		class="mx-auto max-w-[620px] rounded-[13px] border border-line bg-panel px-[14px] py-3 focus-within:border-edge"
+	>
 		<textarea
 			name="message"
 			bind:value={draft}
@@ -34,7 +36,6 @@
 		></textarea>
 
 		<div class="mt-[10px] flex items-center gap-[7px]">
-			<span class="text-[11.5px] text-ink-3">Refresh to see replies</span>
 			<button
 				class="ml-auto rounded-lg bg-ink px-[14px] py-[5.5px] text-[12.5px] font-semibold text-bg hover:bg-white disabled:opacity-40"
 				disabled={!draft.trim()}

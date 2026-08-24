@@ -6,7 +6,9 @@ import { listDocuments, listSkills, listThreads } from '$lib/server/repo';
  * collections here keeps the modals' synchronous `find` and avoids a per-open
  * fetch with a loading state.
  */
-export const load = async () => {
+export const load = async ({ depends }) => {
+  depends('live:threads');
+
   const [documents, skills, threads] = await Promise.all([
     listDocuments(),
     listSkills(),

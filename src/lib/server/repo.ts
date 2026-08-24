@@ -4,6 +4,7 @@ import { db } from './db';
 import { agentSkills, agents, documents, entries, skills, steps, threads } from './db/schema';
 import { agentDto, documentDto, skillDto, type Stat } from './serialize';
 import { relativeTime, slugify } from './api';
+import { publish } from './events/bus';
 
 /**
  * Read helpers shared by the routes. Each returns the frontend-facing DTO, so a
@@ -248,11 +249,14 @@ export const listThreads = async () => {
 export const createThread = async (name: string) => {
   const id = randomUUID();
   await db.insert(threads).values({ id, name, group: 'Active' });
+  publish({ scope: 'threads' });
   return id;
 };
 
 export const renameThread = async (id: string, name: string) => {
   await db.update(threads).set({ name, updatedAt: new Date() }).where(eq(threads.id, id));
+  publish({ scope: 'threads' });
+  publish({ scope: 'thread', threadId: id });
 };
 
 export const getThread = async (id: string) => {
@@ -321,6 +325,9 @@ export const appendMessage = async (input: {
   });
   /** Thread order is recency, so a new message has to move the thread. */
   await db.update(threads).set({ updatedAt: new Date() }).where(eq(threads.id, input.threadId));
+  /** Both scopes: the entry lands in the thread, and recency reorders the list. */
+  publish({ scope: 'thread', threadId: input.threadId });
+  publish({ scope: 'threads' });
   return id;
 };
 
@@ -340,6 +347,7 @@ export const appendActivity = async (input: {
     label: input.label,
     bars: input.bars
   });
+  publish({ scope: 'thread', threadId: input.threadId });
   return id;
 };
 
@@ -410,6 +418,7 @@ export const appendStep = async (input: {
     parentId: input.parentId ?? null,
     badge: input.badge ?? null
   });
+  publish({ scope: 'thread', threadId: input.threadId });
   return id;
 };
 
@@ -423,6 +432,15 @@ export const setAgentStatus = async (
   statusLabel: string,
   threadId: string | null = null
 ) => {
+  /**
+   * Read before write: going idle passes no thread, but the presence row that
+   * has to disappear lives in whichever thread the agent was busy in.
+   */
+  const [before] = await db
+    .select({ busyThreadId: agents.busyThreadId })
+    .from(agents)
+    .where(eq(agents.id, agentId));
+
   await db
     .update(agents)
     .set({
@@ -432,6 +450,9 @@ export const setAgentStatus = async (
       updatedAt: new Date()
     })
     .where(eq(agents.id, agentId));
+
+  for (const id of new Set([threadId, before?.busyThreadId].filter(Boolean) as string[]))
+    publish({ scope: 'thread', threadId: id });
 };
 
 /**
@@ -441,10 +462,19 @@ export const setAgentStatus = async (
  */
 export const clearStaleBusy = async (olderThanMs = 5 * 60_000) => {
   const cutoff = new Date(Date.now() - olderThanMs);
+  const stale = await db
+    .select({ busyThreadId: agents.busyThreadId })
+    .from(agents)
+    .where(and(eq(agents.status, 'busy'), lt(agents.updatedAt, cutoff)));
+  if (!stale.length) return;
+
   await db
     .update(agents)
     .set({ status: 'idle', statusLabel: 'Idle', busyThreadId: null })
     .where(and(eq(agents.status, 'busy'), lt(agents.updatedAt, cutoff)));
+
+  for (const id of new Set(stale.map(row => row.busyThreadId).filter(Boolean) as string[]))
+    publish({ scope: 'thread', threadId: id });
 };
 
 /** Presence rows: who is mid-turn in this thread, and the last step each ran. */

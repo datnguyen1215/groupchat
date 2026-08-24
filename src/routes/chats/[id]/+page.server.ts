@@ -10,7 +10,9 @@ import {
 } from '$lib/server/repo';
 import { startTurn } from '$lib/server/ai/loop';
 
-export const load = async ({ params }) => {
+export const load = async ({ params, depends }) => {
+	depends(`live:thread:${params.id}`);
+
 	const thread = await getThread(params.id);
 	if (!thread) error(404, 'Thread not found');
 
