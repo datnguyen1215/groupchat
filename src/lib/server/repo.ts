@@ -215,190 +215,204 @@ export const uniqueId = async (
  * shows it.
  */
 export const listThreads = async () => {
-	const rows = await db.select().from(threads).orderBy(desc(threads.updatedAt));
+  const rows = await db.select().from(threads).orderBy(desc(threads.updatedAt));
 
-	const latest = await db
-		.selectDistinctOn([entries.threadId], {
-			threadId: entries.threadId,
-			paragraphs: entries.paragraphs,
-			authorId: entries.authorId
-		})
-		.from(entries)
-		.where(eq(entries.kind, 'message'))
-		.orderBy(desc(entries.threadId), desc(entries.seq));
+  const latest = await db
+    .selectDistinctOn([entries.threadId], {
+      threadId: entries.threadId,
+      paragraphs: entries.paragraphs,
+      authorId: entries.authorId
+    })
+    .from(entries)
+    .where(eq(entries.kind, 'message'))
+    .orderBy(desc(entries.threadId), desc(entries.seq));
 
-	const authors = await authorIndex(
-		latest.map((r) => r.authorId).filter((id): id is string => !!id)
-	);
-	const previews = new Map(
-		latest.map((r) => {
-			const name = r.authorId ? (authors.get(r.authorId)?.name ?? '') : '';
-			return [r.threadId, `${name}: ${r.paragraphs[0] ?? ''}`];
-		})
-	);
+  const authors = await authorIndex(latest.map(r => r.authorId).filter((id): id is string => !!id));
+  const previews = new Map(
+    latest.map(r => {
+      const name = r.authorId ? (authors.get(r.authorId)?.name ?? '') : '';
+      return [r.threadId, `${name}: ${r.paragraphs[0] ?? ''}`];
+    })
+  );
 
-	return rows.map((r) => ({ ...r, preview: previews.get(r.id) ?? 'No messages yet' }));
+  return rows.map(r => ({ ...r, preview: previews.get(r.id) ?? 'No messages yet' }));
+};
+
+/** New threads start untitled; the user renames them from the sidebar or header. */
+export const createThread = async (name: string) => {
+  const base = slugify(name);
+  const rows = await db
+    .select({ id: threads.id })
+    .from(threads)
+    .where(sql`${threads.id} = ${base} or ${threads.id} like ${base + '-%'}`);
+  const taken = new Set(rows.map(r => r.id));
+  let id = base;
+  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+
+  await db.insert(threads).values({ id, name, group: 'Active' });
+  return id;
+};
+
+export const renameThread = async (id: string, name: string) => {
+  await db.update(threads).set({ name, updatedAt: new Date() }).where(eq(threads.id, id));
 };
 
 export const getThread = async (id: string) => {
-	const [row] = await db.select().from(threads).where(eq(threads.id, id));
-	return row ?? null;
+  const [row] = await db.select().from(threads).where(eq(threads.id, id));
+  return row ?? null;
 };
 
 /** The message stream, oldest first. `seq` is the only ordering key. */
 export const listEntries = async (threadId: string) => {
-	const rows = await db
-		.select()
-		.from(entries)
-		.where(eq(entries.threadId, threadId))
-		.orderBy(asc(entries.seq));
-	const authors = await authorIndex(rows.map((r) => r.authorId).filter((id): id is string => !!id));
+  const rows = await db
+    .select()
+    .from(entries)
+    .where(eq(entries.threadId, threadId))
+    .orderBy(asc(entries.seq));
+  const authors = await authorIndex(rows.map(r => r.authorId).filter((id): id is string => !!id));
 
-	return rows.map((r) => {
-		const author = r.authorId ? authors.get(r.authorId) : null;
-		return {
-			kind: r.kind,
-			id: r.id,
-			author: author?.name ?? 'Unknown',
-			authorId: r.authorId,
-			initials: author?.initials ?? '?',
-			color: author?.color ?? '#5b5b66',
-			tag: r.tag ?? undefined,
-			isOrchestrator: r.tag === 'orch',
-			isYou: r.authorId === 'you',
-			time: relativeTime(r.createdAt),
-			paragraphs: r.paragraphs,
-			docId: r.docId ?? undefined,
-			label: r.label ?? '',
-			bars: r.bars
-		};
-	});
+  return rows.map(r => {
+    const author = r.authorId ? authors.get(r.authorId) : null;
+    return {
+      kind: r.kind,
+      id: r.id,
+      author: author?.name ?? 'Unknown',
+      authorId: r.authorId,
+      initials: author?.initials ?? '?',
+      color: author?.color ?? '#5b5b66',
+      tag: r.tag ?? undefined,
+      isOrchestrator: r.tag === 'orch',
+      isYou: r.authorId === 'you',
+      time: relativeTime(r.createdAt),
+      paragraphs: r.paragraphs,
+      docId: r.docId ?? undefined,
+      label: r.label ?? '',
+      bars: r.bars
+    };
+  });
 };
 
 /** Next `seq` for a thread. Callers insert immediately after. */
 const nextSeq = async (threadId: string) => {
-	const [row] = await db
-		.select({ max: sql<number>`coalesce(max(${entries.seq}), 0)::int` })
-		.from(entries)
-		.where(eq(entries.threadId, threadId));
-	return (row?.max ?? 0) + 1;
+  const [row] = await db
+    .select({ max: sql<number>`coalesce(max(${entries.seq}), 0)::int` })
+    .from(entries)
+    .where(eq(entries.threadId, threadId));
+  return (row?.max ?? 0) + 1;
 };
 
 /** Appends one message. The only way a message enters a thread. */
 export const appendMessage = async (input: {
-	threadId: string;
-	authorId: string;
-	paragraphs: string[];
-	tag?: string;
-	docId?: string;
+  threadId: string;
+  authorId: string;
+  paragraphs: string[];
+  tag?: string;
+  docId?: string;
 }) => {
-	const seq = await nextSeq(input.threadId);
-	const id = `${input.threadId}-e${seq}`;
-	await db.insert(entries).values({
-		id,
-		threadId: input.threadId,
-		kind: 'message',
-		seq,
-		authorId: input.authorId,
-		tag: input.tag ?? null,
-		paragraphs: input.paragraphs,
-		docId: input.docId ?? null
-	});
-	/** Thread order is recency, so a new message has to move the thread. */
-	await db
-		.update(threads)
-		.set({ updatedAt: new Date() })
-		.where(eq(threads.id, input.threadId));
-	return id;
+  const seq = await nextSeq(input.threadId);
+  const id = `${input.threadId}-e${seq}`;
+  await db.insert(entries).values({
+    id,
+    threadId: input.threadId,
+    kind: 'message',
+    seq,
+    authorId: input.authorId,
+    tag: input.tag ?? null,
+    paragraphs: input.paragraphs,
+    docId: input.docId ?? null
+  });
+  /** Thread order is recency, so a new message has to move the thread. */
+  await db.update(threads).set({ updatedAt: new Date() }).where(eq(threads.id, input.threadId));
+  return id;
 };
 
 /** The collapsed sparkline that summarises one agent's tool run. */
 export const appendActivity = async (input: {
-	threadId: string;
-	label: string;
-	bars: ('ok' | 'run' | 'spawn')[];
+  threadId: string;
+  label: string;
+  bars: ('ok' | 'run' | 'spawn')[];
 }) => {
-	const seq = await nextSeq(input.threadId);
-	const id = `${input.threadId}-a${seq}`;
-	await db.insert(entries).values({
-		id,
-		threadId: input.threadId,
-		kind: 'activity',
-		seq,
-		label: input.label,
-		bars: input.bars
-	});
-	return id;
+  const seq = await nextSeq(input.threadId);
+  const id = `${input.threadId}-a${seq}`;
+  await db.insert(entries).values({
+    id,
+    threadId: input.threadId,
+    kind: 'activity',
+    seq,
+    label: input.label,
+    bars: input.bars
+  });
+  return id;
 };
 
 /** The activity drawer's trace, grouped exactly as it is stored. */
 export const listSteps = async (threadId: string) => {
-	const rows = await db
-		.select()
-		.from(steps)
-		.where(eq(steps.threadId, threadId))
-		.orderBy(asc(steps.seq));
+  const rows = await db
+    .select()
+    .from(steps)
+    .where(eq(steps.threadId, threadId))
+    .orderBy(asc(steps.seq));
 
-	const groups: { label: string; steps: unknown[] }[] = [];
-	for (const r of rows) {
-		const step = {
-			id: r.id,
-			state: r.state,
-			name: r.name,
-			detail: r.detail,
-			duration: r.durationMs === null ? 'running' : formatDuration(r.durationMs),
-			child: Boolean(r.parentId),
-			badge: r.badge ?? undefined
-		};
-		const last = groups.at(-1);
-		if (last?.label === r.groupLabel) last.steps.push(step);
-		else groups.push({ label: r.groupLabel, steps: [step] });
-	}
-	return groups as { label: string; steps: Step[] }[];
+  const groups: { label: string; steps: unknown[] }[] = [];
+  for (const r of rows) {
+    const step = {
+      id: r.id,
+      state: r.state,
+      name: r.name,
+      detail: r.detail,
+      duration: r.durationMs === null ? 'running' : formatDuration(r.durationMs),
+      child: Boolean(r.parentId),
+      badge: r.badge ?? undefined
+    };
+    const last = groups.at(-1);
+    if (last?.label === r.groupLabel) last.steps.push(step);
+    else groups.push({ label: r.groupLabel, steps: [step] });
+  }
+  return groups as { label: string; steps: Step[] }[];
 };
 
 type Step = {
-	id: string;
-	state: 'ok' | 'run' | 'spawn';
-	name: string;
-	detail: string;
-	duration: string;
-	child: boolean;
-	badge?: string;
+  id: string;
+  state: 'ok' | 'run' | 'spawn';
+  name: string;
+  detail: string;
+  duration: string;
+  child: boolean;
+  badge?: string;
 };
 
 const formatDuration = (ms: number) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
 
 /** One tool call. Written after the call resolves, so the duration is real. */
 export const appendStep = async (input: {
-	threadId: string;
-	groupLabel: string;
-	state: 'ok' | 'run' | 'spawn';
-	name: string;
-	detail: string;
-	durationMs: number | null;
-	parentId?: string;
-	badge?: string;
+  threadId: string;
+  groupLabel: string;
+  state: 'ok' | 'run' | 'spawn';
+  name: string;
+  detail: string;
+  durationMs: number | null;
+  parentId?: string;
+  badge?: string;
 }) => {
-	const [row] = await db
-		.select({ max: sql<number>`coalesce(max(${steps.seq}), 0)::int` })
-		.from(steps)
-		.where(eq(steps.threadId, input.threadId));
-	const seq = (row?.max ?? 0) + 1;
-	const id = `${input.threadId}-s${seq}`;
-	await db.insert(steps).values({
-		id,
-		threadId: input.threadId,
-		groupLabel: input.groupLabel,
-		seq,
-		state: input.state,
-		name: input.name,
-		detail: input.detail,
-		durationMs: input.durationMs,
-		parentId: input.parentId ?? null,
-		badge: input.badge ?? null
-	});
-	return id;
+  const [row] = await db
+    .select({ max: sql<number>`coalesce(max(${steps.seq}), 0)::int` })
+    .from(steps)
+    .where(eq(steps.threadId, input.threadId));
+  const seq = (row?.max ?? 0) + 1;
+  const id = `${input.threadId}-s${seq}`;
+  await db.insert(steps).values({
+    id,
+    threadId: input.threadId,
+    groupLabel: input.groupLabel,
+    seq,
+    state: input.state,
+    name: input.name,
+    detail: input.detail,
+    durationMs: input.durationMs,
+    parentId: input.parentId ?? null,
+    badge: input.badge ?? null
+  });
+  return id;
 };
 
 /**
@@ -406,20 +420,20 @@ export const appendStep = async (input: {
  * the status so a busy agent appears in the thread it is actually working in.
  */
 export const setAgentStatus = async (
-	agentId: string,
-	status: 'idle' | 'busy' | 'done',
-	statusLabel: string,
-	threadId: string | null = null
+  agentId: string,
+  status: 'idle' | 'busy' | 'done',
+  statusLabel: string,
+  threadId: string | null = null
 ) => {
-	await db
-		.update(agents)
-		.set({
-			status,
-			statusLabel,
-			busyThreadId: status === 'busy' ? threadId : null,
-			updatedAt: new Date()
-		})
-		.where(eq(agents.id, agentId));
+  await db
+    .update(agents)
+    .set({
+      status,
+      statusLabel,
+      busyThreadId: status === 'busy' ? threadId : null,
+      updatedAt: new Date()
+    })
+    .where(eq(agents.id, agentId));
 };
 
 /**
@@ -428,36 +442,36 @@ export const setAgentStatus = async (
  * spinning forever and the only fix is editing the database by hand.
  */
 export const clearStaleBusy = async (olderThanMs = 5 * 60_000) => {
-	const cutoff = new Date(Date.now() - olderThanMs);
-	await db
-		.update(agents)
-		.set({ status: 'idle', statusLabel: 'Idle', busyThreadId: null })
-		.where(and(eq(agents.status, 'busy'), lt(agents.updatedAt, cutoff)));
+  const cutoff = new Date(Date.now() - olderThanMs);
+  await db
+    .update(agents)
+    .set({ status: 'idle', statusLabel: 'Idle', busyThreadId: null })
+    .where(and(eq(agents.status, 'busy'), lt(agents.updatedAt, cutoff)));
 };
 
 /** Presence rows: who is mid-turn in this thread, and the last step each ran. */
 export const listBusyAgents = async (threadId: string) => {
-	const rows = await db
-		.select()
-		.from(agents)
-		.where(and(eq(agents.status, 'busy'), eq(agents.busyThreadId, threadId)));
-	if (!rows.length) return [];
+  const rows = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.status, 'busy'), eq(agents.busyThreadId, threadId)));
+  if (!rows.length) return [];
 
-	const recent = await db
-		.select()
-		.from(steps)
-		.where(eq(steps.threadId, threadId))
-		.orderBy(desc(steps.seq))
-		.limit(1);
-	const last = recent[0];
+  const recent = await db
+    .select()
+    .from(steps)
+    .where(eq(steps.threadId, threadId))
+    .orderBy(desc(steps.seq))
+    .limit(1);
+  const last = recent[0];
 
-	return rows.map((r) => ({
-		id: r.id,
-		name: r.name,
-		initials: r.initials,
-		color: r.color,
-		tag: r.role,
-		statusLabel: r.statusLabel,
-		lastStep: last ? { name: last.name, detail: last.detail } : null
-	}));
+  return rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    initials: r.initials,
+    color: r.color,
+    tag: r.role,
+    statusLabel: r.statusLabel,
+    lastStep: last ? { name: last.name, detail: last.detail } : null
+  }));
 };
