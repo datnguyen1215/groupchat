@@ -13,6 +13,13 @@
 - Say less. The user does not want to read much.
 - Ask one question at a time. Never bundle questions.
 
+## Stack
+
+- SvelteKit 2 + Svelte 5 (runes). TypeScript.
+- Tailwind CSS 4 (Vite plugin, not PostCSS).
+- Postgres via `postgres` (no ORM).
+- Vitest for unit tests. Playwright for e2e.
+
 ## Ports
 
 - Every service in this project runs on a port in the **10200+** range.
@@ -25,9 +32,20 @@
 | 10201 | Postgres (Docker)                  |
 | 10202 | Test server (Playwright)           |
 | 10203 | Preview server (`npm run preview`) |
+| 10204 | UI mockup server (`ui-variations` skill) |
 
 ## Reports
 
 - Report what changed and that it passed. Nothing else.
 - No "design calls", "worth flagging", or "notes" sections.
 - Fixed is fixed. Do not report failures you already fixed.
+
+## Worktrees
+
+Multi-agent environment. Never edit the main checkout directly.
+
+- Create a git worktree for each session's changes.
+- Put it under `~/tmp/` — e.g. `~/tmp/groupchat-<task>`.
+- Do all work in that worktree.
+- Spawning agents? Tell each one the worktree path. They must work there too.
+- After merging into `main`: remove the worktree (`git worktree remove`) and delete the branch (`git branch -d`).
