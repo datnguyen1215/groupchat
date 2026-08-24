@@ -49,3 +49,4 @@ Multi-agent environment. Never edit the main checkout directly.
 - Do all work in that worktree.
 - Spawning agents? Tell each one the worktree path. They must work there too.
 - After merging into `main`: remove the worktree (`git worktree remove`) and delete the branch (`git branch -d`).
+- Only touch your own worktree and branch. Never remove or delete anyone else's.
