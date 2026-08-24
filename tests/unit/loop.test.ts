@@ -79,18 +79,51 @@ describe('detailOf', () => {
 });
 
 describe('describe', () => {
-  it('uses the error message', () => {
-    expect(errorLine(new Error('Authentication Fails'))).toBe('Authentication Fails');
+  const providerError = (statusCode: number, message: string) =>
+    Object.assign(new Error(message), { statusCode });
+
+  it('names the failure by status, without quoting the provider', () => {
+    expect(errorLine(providerError(401, 'anything'))).toBe(
+      'the model provider rejected our credentials'
+    );
+    expect(errorLine(providerError(429, 'anything'))).toBe(
+      'the model provider is rate limiting us'
+    );
+    expect(errorLine(providerError(503, 'anything'))).toBe(
+      'the model provider is having trouble'
+    );
   });
 
-  /* Provider errors dump headers and a body; the thread gets the first line only. */
-  it('keeps only the first line of a multi-line provider error', () => {
-    const err = new Error('Authentication Fails, your api key is invalid\nstatusCode: 401\n{...}');
-    expect(errorLine(err)).toBe('Authentication Fails, your api key is invalid');
+  /**
+   * The reason this maps instead of passing through: the provider's auth error
+   * quotes part of the API key, and this string is stored as a chat message.
+   */
+  it('never leaks the provider message, key fragments included', () => {
+    const leaky = providerError(
+      401,
+      'Authentication Fails, Your api key: ****316c is invalid'
+    );
+    const line = errorLine(leaky);
+
+    expect(line).not.toContain('316c');
+    expect(line).not.toContain('api key');
+    expect(line).not.toContain('Authentication Fails');
   });
 
-  it('falls back to the value when it is not an error object', () => {
-    expect(errorLine('socket hang up')).toBe('socket hang up');
-    expect(errorLine(undefined)).toBe('undefined');
+  it('falls back without inspecting the value when there is no status', () => {
+    expect(errorLine(new Error('socket hang up: 10.0.0.4:5432'))).toBe(
+      'something went wrong on our side'
+    );
+    expect(errorLine('raw string')).toBe('something went wrong on our side');
+    expect(errorLine(undefined)).toBe('something went wrong on our side');
+  });
+
+  it('groups unrecognised 4xx and 5xx rather than passing them through', () => {
+    expect(errorLine(providerError(418, 'teapot'))).toBe(
+      'the model provider rejected the request'
+    );
+    expect(errorLine(providerError(599, 'unknown'))).toBe(
+      'the model provider is having trouble'
+    );
   });
 });

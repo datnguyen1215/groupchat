@@ -108,7 +108,7 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
 		 * this agent for an answer, and "I failed" is an answer it can act on.
 		 */
 		console.error(`[agent loop] ${agent.name}`, error);
-		return `${agent.name} could not finish: ${describe(error)}`;
+		return `${agent.name} could not finish — ${describe(error)}.`;
 	} finally {
 		/** Always. A stuck `busy` row is a presence indicator that never clears. */
 		await setAgentStatus(agentId, 'idle', 'Idle');
@@ -149,18 +149,37 @@ export const runOrchestrator = async (threadId: string) => {
 			threadId,
 			authorId: orch.id,
 			tag: 'orch',
-			paragraphs: [`The turn failed: ${describe(error)}`]
+			paragraphs: [`I could not run this turn — ${describe(error)}. Nothing was lost; try again.`]
 		});
 	} finally {
 		await setAgentStatus(orch.id, 'idle', 'Idle');
 	}
 };
 
-/** The one line of an error worth putting in front of a person. */
+/**
+ * What the thread is allowed to say about a failure.
+ *
+ * Provider messages are never passed through. They quote request details back —
+ * the auth error includes part of the API key — and whatever this returns is
+ * stored as a message that anyone with access to the thread can read. So the
+ * status code picks from fixed wording, and the real error goes to the log.
+ */
 export const describe = (error: unknown) => {
-	if (error && typeof error === 'object' && 'message' in error)
-		return String((error as { message: unknown }).message).split('\n')[0];
-	return String(error);
+	const status = statusOf(error);
+
+	if (status === 401 || status === 403) return 'the model provider rejected our credentials';
+	if (status === 429) return 'the model provider is rate limiting us';
+	if (status === 408 || status === 504) return 'the model provider timed out';
+	if (status && status >= 500) return 'the model provider is having trouble';
+	if (status && status >= 400) return 'the model provider rejected the request';
+
+	return 'something went wrong on our side';
+};
+
+const statusOf = (error: unknown) => {
+	if (!error || typeof error !== 'object') return null;
+	const status = (error as { statusCode?: unknown }).statusCode;
+	return typeof status === 'number' ? status : null;
 };
 
 /**
