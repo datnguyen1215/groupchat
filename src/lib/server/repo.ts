@@ -454,7 +454,13 @@ export const appendStep = async (input: {
     badge: input.badge ?? null
   });
   log.info(
-    { id, threadId: input.threadId, name: input.name, state: input.state, ms: input.durationMs },
+    {
+      id,
+      threadId: input.threadId,
+      stepName: input.name,
+      state: input.state,
+      ms: input.durationMs
+    },
     'step appended'
   );
   publish({ scope: 'thread', threadId: input.threadId });
