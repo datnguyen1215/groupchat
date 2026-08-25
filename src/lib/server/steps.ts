@@ -4,7 +4,7 @@ type StepRow = {
   id: string;
   seq: number;
   groupLabel: string;
-  state: 'ok' | 'run' | 'spawn';
+  state: 'ok' | 'run' | 'spawn' | 'say' | 'doc';
   name: string;
   detail: string;
   durationMs: number | null;
@@ -15,7 +15,17 @@ type StepRow = {
 const formatDuration = (ms: number) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
 
 /**
- * Collapses the step rows into the drawer's runs. A run ends when the label
+ * A comment or a document write is instantaneous — it has no duration to miss,
+ * so a null one means "not applicable", not "still going". Only a tool call
+ * with no duration yet is actually running.
+ */
+const durationText = (state: StepRow['state'], ms: number | null) => {
+  if (ms !== null) return formatDuration(ms);
+  return state === 'say' || state === 'doc' ? '' : 'running';
+};
+
+/**
+ * Collapses the step rows into the feed's runs. A run ends when the label
  * changes, so one agent running twice with another agent in between yields two
  * groups carrying the same label.
  *
@@ -31,7 +41,7 @@ export const groupSteps = (rows: StepRow[]): StepGroup[] => {
       state: r.state,
       name: r.name,
       detail: r.detail,
-      duration: r.durationMs === null ? 'running' : formatDuration(r.durationMs),
+      duration: durationText(r.state, r.durationMs),
       child: Boolean(r.parentId),
       badge: r.badge ?? undefined
     };

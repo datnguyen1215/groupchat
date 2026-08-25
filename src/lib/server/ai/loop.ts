@@ -7,28 +7,50 @@ import { orchestratorPrompt, workerPrompt } from './prompts';
 import { orchestratorTools, workerTools, type ToolContext } from './tools';
 import {
   BLOCKED,
-  appendActivity,
   appendError,
   appendStep,
   listEntries,
   setAgentStatus
 } from '../repo';
 import { logger, since } from '../logger';
-import { detailOf } from './detail';
+import { summarise } from './detail';
 
 const log = logger('agent');
 
-/** Tool calls that are the agent talking, not the agent working. */
-export const SPEECH = new Set(['send_chat_message', 'finish']);
+/**
+ * `finish` is the agent ending its turn, not doing anything. It is the only
+ * tool call the feed drops — everything else an agent does is something a
+ * reader might want to see.
+ */
+export const SILENT = new Set(['finish']);
 
-/** The sparkline for one turn: a bar per working tool call, speech excluded. */
-export const barsFor = (
-  steps: { toolCalls?: { toolName: string }[] }[]
-): ('ok' | 'run' | 'spawn')[] =>
-  steps
-    .flatMap(step => step.toolCalls ?? [])
-    .filter(call => !SPEECH.has(call.toolName))
-    .map(call => (call.toolName === 'run_agent' ? 'spawn' : 'ok'));
+/**
+ * How one tool call reads in the feed: its state, and the name shown against
+ * it. Working calls keep their tool name in mono; the three an agent is
+ * *judged* by — talking, writing, revising — get a sentence instead, because
+ * "Wren commented" is what the reader is scanning for, not `send_chat_message`.
+ */
+const FEED = {
+  send_chat_message: { state: 'say', verb: 'commented' },
+  write_document: { state: 'doc', verb: 'wrote document' },
+  update_document: { state: 'doc', verb: 'updated document' },
+  run_agent: { state: 'spawn', verb: null }
+} as const;
+
+export type FeedState = 'ok' | 'run' | 'spawn' | 'say' | 'doc';
+
+/** The state one tool call carries in the feed. */
+export const stateFor = (toolName: string): FeedState =>
+  FEED[toolName as keyof typeof FEED]?.state ?? 'ok';
+
+/**
+ * The name shown against one call. A sentence for the three that read as the
+ * agent acting in the thread, the raw tool name for the rest.
+ */
+export const nameFor = (agentName: string, toolName: string) => {
+  const verb = FEED[toolName as keyof typeof FEED]?.verb;
+  return verb ? `${agentName} ${verb}` : toolName;
+};
 
 /**
  * The transcript the model sees. Activity strips are skipped — they summarise
@@ -43,34 +65,35 @@ const transcript = async (threadId: string) => {
 };
 
 /**
- * Writes one agent's tool calls into `steps` and drops a collapsed strip into
- * the thread. Speech is excluded: `send_chat_message` already produced a
- * message entry, and showing it again as a tool call would double it up.
+ * Writes one agent's turn into `steps` — the whole turn, not just the tools.
+ * A comment, a document write and a search all land here in the order they
+ * happened, because the feed is the one place that answers "what went on in
+ * this thread".
+ *
+ * The chat stream still carries the comment itself; this row is the same event
+ * seen from the activity side, which is why it holds only a summary of it.
  */
 const recordSteps = async (
   threadId: string,
   label: string,
   steps: { toolCalls?: { toolName: string; input: unknown }[] }[]
 ) => {
-  const bars = barsFor(steps);
-  if (!bars.length) return;
-
-  const working = steps
+  const calls = steps
     .flatMap(step => step.toolCalls ?? [])
-    .filter(call => !SPEECH.has(call.toolName));
+    .filter(call => !SILENT.has(call.toolName));
 
-  for (const [i, call] of working.entries())
+  for (const call of calls) {
+    const state = stateFor(call.toolName);
     await appendStep({
       threadId,
       groupLabel: label,
-      state: bars[i],
-      name: call.toolName,
-      detail: detailOf(call.input),
+      state,
+      name: nameFor(label, call.toolName),
+      detail: summarise(call.input),
       durationMs: null,
-      badge: bars[i] === 'spawn' ? 'agent' : undefined
+      badge: state === 'spawn' ? 'agent' : undefined
     });
-
-  await appendActivity({ threadId, label: `${label} · ${bars.length} tools`, bars });
+  }
 };
 
 const agentRow = async (id: string) => {

@@ -12,7 +12,7 @@
   const log = trace('ChatPage');
 
   const thread = $derived(data.thread);
-  const steps = $derived(data.activity.reduce((n, g) => n + g.steps.length, 0));
+  const events = $derived(data.activity.reduce((n, g) => n + g.steps.length, 0));
 
   let activityOpen = $state(false);
   let docsOpen = $state(false);
@@ -102,7 +102,7 @@
         log.info({ threadId: thread.id, open: activityOpen }, 'activity toggled');
       }}
     >
-      Activity · {steps}
+      Activity · {events}
     </button>
     <button
       class="rounded-[7px] border border-line px-[11px] py-[5px] text-[12.5px] text-ink-2 hover:border-ink-3 hover:text-ink"
@@ -119,16 +119,11 @@
 
   <div class="flex min-h-0 flex-1">
     <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-      <Conversation
-        bind:this={conversation}
-        entries={data.entries}
-        busy={data.busy}
-        onopenactivity={() => (activityOpen = true)}
-      />
+      <Conversation bind:this={conversation} entries={data.entries} busy={data.busy} />
       <Composer onsend={() => conversation.pinToBottom()} />
       <ActivityDrawer
         groups={data.activity}
-        count={steps}
+        count={events}
         open={activityOpen}
         onclose={() => (activityOpen = false)}
       />

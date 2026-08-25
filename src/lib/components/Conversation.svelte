@@ -8,7 +8,7 @@
   import PresenceRow from './PresenceRow.svelte';
 
   type Entry = {
-    kind: 'message' | 'activity' | 'error';
+    kind: 'message' | 'error';
     id: string;
     author: string;
     initials: string;
@@ -20,7 +20,6 @@
     paragraphs: string[];
     docId?: string;
     label: string;
-    bars: ('ok' | 'run' | 'spawn')[];
   };
   type Busy = {
     id: string;
@@ -32,10 +31,8 @@
     lastStep: { name: string; detail: string } | null;
   };
 
-  type Props = { entries: Entry[]; busy: Busy[]; onopenactivity: () => void };
-  const { entries, busy, onopenactivity }: Props = $props();
-
-  const barColor = { ok: 'bg-ok', run: 'bg-run', spawn: 'bg-accent' };
+  type Props = { entries: Entry[]; busy: Busy[] };
+  const { entries, busy }: Props = $props();
 
   let viewport: HTMLDivElement;
 
@@ -79,21 +76,7 @@
 >
   <div class="mx-auto max-w-[620px] px-6">
     {#each entries as entry (entry.id)}
-      {#if entry.kind === 'activity'}
-        <div class="mb-5 pl-[30px]">
-          <button
-            class="inline-flex items-center gap-2 rounded-full border border-line bg-panel py-[5px] pr-3 pl-[10px] text-[12px] text-ink-3 hover:border-edge hover:text-ink-2"
-            onclick={onopenactivity}
-          >
-            <span class="flex items-center gap-[2px]">
-              {#each entry.bars as bar, i (i)}
-                <i class="block h-[9px] w-[3px] rounded-sm {barColor[bar]}"></i>
-              {/each}
-            </span>
-            {entry.label}
-          </button>
-        </div>
-      {:else if entry.kind === 'error'}
+      {#if entry.kind === 'error'}
         <!-- A failure, not an agent talking: no avatar, no name, no tag. -->
         <!-- `status`, so a reader who cannot see the rule still hears the break. -->
         <div role="status" aria-label="Error" class="mb-5 flex items-center gap-[10px] pl-[30px]">
