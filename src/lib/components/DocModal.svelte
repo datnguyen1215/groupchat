@@ -42,6 +42,7 @@
   <Modal
     title={doc.name}
     meta="{doc.author} · {doc.updated} · {doc.version} · {doc.size}"
+    width="max-w-[1060px]"
     onclose={() => overlay.closeDoc()}
   >
     {#snippet body()}
