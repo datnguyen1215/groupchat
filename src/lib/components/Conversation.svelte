@@ -57,7 +57,8 @@
         </div>
       {:else if entry.kind === 'error'}
         <!-- A failure, not an agent talking: no avatar, no name, no tag. -->
-        <div class="mb-5 flex items-center gap-[10px] pl-[30px]">
+        <!-- `status`, so a reader who cannot see the rule still hears the break. -->
+        <div role="status" aria-label="Error" class="mb-5 flex items-center gap-[10px] pl-[30px]">
           <span class="h-px flex-1 bg-line"></span>
           <span class="flex items-center gap-[6px] text-[11px] whitespace-nowrap text-clay/80">
             <Icon name="warn" />
