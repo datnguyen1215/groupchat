@@ -37,6 +37,10 @@
 - Never log a field called `name`; pino reserves it. Use `threadName`, `agentName`.
 - Turn on the noisy lines with `LOG_LEVEL=debug`, or `localStorage.LOG_LEVEL = 'debug'` in the browser.
 
+## Git
+
+- Commit `package-lock.json` in its own separate commit. Never mix it with code changes.
+
 ## Ports
 
 - Every service in this project runs on a port in the **10200+** range.
