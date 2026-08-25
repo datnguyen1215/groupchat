@@ -22,6 +22,13 @@
 - DeepSeek for AI (`@ai-sdk/deepseek`). Model is `deepseek-v4-flash` — v4 first, flash after.
   That name is real. Do not "correct" it. Set in `src/lib/server/ai/model.ts`.
 
+## Keyed lists
+
+- `{#each}` keys must be ids, never display strings.
+- A label, name, title or timestamp is not an id. They repeat, and Svelte throws `each_key_duplicate`.
+- No id on the row? Give it one at the source — the query, the mapper, the seed data. Do not key on the index.
+- Grouping rows into runs? The group needs its own id too. The label it displays is not it.
+
 ## Tests
 
 - Every feature ships with tests. Unit (Vitest), e2e (Playwright), or both.
