@@ -142,6 +142,32 @@ test.describe('presence', () => {
     await ready(page, `/chats/${THREAD}`);
     await expect(page.getByLabel('Working')).toHaveCount(0);
   });
+
+  /**
+   * An agent parked in `run_agent` keeps a `busy` row so the turn can still be
+   * cleaned up, but it has nothing to report while it waits. Showing it puts a
+   * second working row next to the workers it is waiting on, which reads as one
+   * more agent doing work.
+   */
+  test('hides the row for an agent that is only waiting on its delegates', async ({ page }) => {
+    await seedEntries([{ author: 'you', text: 'go' }]);
+    await setStatus(AGENT, 'busy', 'Delegating');
+
+    await ready(page, `/chats/${THREAD}`);
+
+    await expect(page.getByText('Probe', { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('Working')).toHaveCount(0);
+  });
+
+  test('shows the row again once it goes back to composing', async ({ page }) => {
+    await seedEntries([{ author: 'you', text: 'go' }]);
+    await setStatus(AGENT, 'busy', 'Thinking');
+
+    await ready(page, `/chats/${THREAD}`);
+
+    await expect(page.getByText('Probe', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Working')).toBeVisible();
+  });
 });
 
 test.describe('composer', () => {
