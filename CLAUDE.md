@@ -35,6 +35,13 @@
 - Pick unit for logic, e2e for user flows. When unsure, write both.
 - No feature is done until its tests pass.
 
+## Command output
+
+- Redirect long-running commands to a log file: `npm test > ~/tmp/test.log 2>&1`.
+- Applies to test runs, builds, dev servers, migrations — anything noisy.
+- Name the file after the task: `~/tmp/groupchat-<task>.log`.
+- Read the log to inspect results. Tell the user the path when it matters.
+
 ## Live updates
 
 - SSE pushes thread changes to the browser. One stream for the whole app.
