@@ -110,7 +110,7 @@ Before merging a branch into `master`, in order:
 Multi-agent environment. Never edit the main checkout directly.
 
 - Create a git worktree for each session's changes.
-- Put it under `~/tmp/` — e.g. `~/tmp/groupchat-<task>`.
+- Put it under `~/tmp/groupchat/worktrees/` — e.g. `~/tmp/groupchat/worktrees/<task>`.
 - Do all work in that worktree.
 - Spawning agents? Tell each one the worktree path. They must work there too.
 - After merging into `master`: remove the worktree (`git worktree remove`) and delete the branch (`git branch -d`).
