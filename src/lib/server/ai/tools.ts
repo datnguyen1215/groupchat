@@ -5,12 +5,14 @@ import { documents, skills } from '../db/schema';
 import { eq, sql } from 'drizzle-orm';
 import {
   appendMessage,
+  createDocument,
+  deleteDocument,
   getDocument,
   getSkill,
   listAgents,
   listDocuments,
   listSkills,
-  uniqueId
+  updateDocument
 } from '../repo';
 import { logger, since } from '../logger';
 import { detailOf } from './detail';
@@ -200,10 +202,12 @@ const writeTools = (ctx: ToolContext) => ({
       body: z.string().describe('The full markdown body.')
     }),
     execute: async ({ name, body }) => {
-      const id = await uniqueId(documents, name);
-      await db
-        .insert(documents)
-        .values({ id, name, threadId: ctx.threadId, authorId: ctx.agentId, body });
+      const id = await createDocument({
+        name,
+        threadId: ctx.threadId,
+        authorId: ctx.agentId,
+        body
+      });
       return { id, name };
     }
   }),
@@ -224,16 +228,8 @@ const writeTools = (ctx: ToolContext) => ({
       if (doc.threadId !== ctx.threadId)
         return { error: `Document "${id}" belongs to another thread.` };
 
-      await db
-        .update(documents)
-        .set({
-          body,
-          ...(name ? { name } : {}),
-          /** The same in-place bump the PATCH route does, so both paths agree. */
-          version: sql`${documents.version} + 1`,
-          updatedAt: new Date()
-        })
-        .where(eq(documents.id, id));
+      /** Same repo call the PATCH route makes, so both paths bump alike. */
+      await updateDocument(id, { body, ...(name ? { name } : {}) });
 
       return { id, name: name ?? doc.name, version: doc.versionNumber + 1 };
     }
@@ -253,7 +249,7 @@ const writeTools = (ctx: ToolContext) => ({
         return { error: `Document "${id}" belongs to another thread.` };
 
       /** Messages referencing it keep their chip; `entries.doc_id` nulls out. */
-      await db.delete(documents).where(eq(documents.id, id));
+      await deleteDocument(id);
       return { id, deleted: true };
     }
   }),

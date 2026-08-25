@@ -1,8 +1,12 @@
 import type { RequestHandler } from './$types';
-import { db } from '$lib/server/db';
-import { documents } from '$lib/server/db/schema';
 import { Fields, fail, ok, readJson } from '$lib/server/api';
-import { agentExists, getDocument, listDocuments, threadExists, uniqueId } from '$lib/server/repo';
+import {
+  agentExists,
+  createDocument,
+  getDocument,
+  listDocuments,
+  threadExists
+} from '$lib/server/repo';
 
 export const GET: RequestHandler = async ({ url }) => {
   const threadId = url.searchParams.get('threadId') ?? undefined;
@@ -32,10 +36,12 @@ export const POST: RequestHandler = async ({ request }) => {
     problems.push({ field: 'authorId', message: 'no such agent' });
   if (problems.length) fail(422, 'Validation failed', problems);
 
-  const id = await uniqueId(documents, name!);
-  await db
-    .insert(documents)
-    .values({ id, name: name!, threadId: threadId!, authorId: authorId!, body: text });
+  const id = await createDocument({
+    name: name!,
+    threadId: threadId!,
+    authorId: authorId!,
+    body: text
+  });
 
   return ok({ document: await getDocument(id) }, 201);
 };
