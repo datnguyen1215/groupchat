@@ -1,13 +1,16 @@
 /**
 /**
- * `finish` is the agent ending its turn, not doing anything. It is the only
- * tool call the feed drops — everything else an agent does is something a
- * reader might want to see.
+ * Tool calls the feed drops. `finish` is the agent ending its turn, not doing
+ * anything. `set_status` is the agent captioning the work rather than doing it
+ * — its title already renders on the presence row, and recording it as a step
+ * too would bury the real steps under a running commentary on them.
+ *
+ * Everything else an agent does is something a reader might want to see.
  *
  * Here rather than in `loop.ts` for the same reason `summarise` is: `tools.ts`
  * needs it too, and `loop.ts` already imports `tools.ts`.
  */
-export const SILENT = new Set(['finish']);
+export const SILENT = new Set(['finish', 'set_status']);
 
 /**
  * A one-line summary of a tool's input: the activity feed's detail column, and
@@ -45,4 +48,32 @@ export const summarise = (input: unknown) => {
     .find(Boolean);
 
   return joined ? clip(joined) : '';
+};
+
+/**
+ * How one tool call reads in the feed: its state, and the name shown against
+ * it. Working calls keep their tool name in mono; the three an agent is
+ * *judged* by — talking, writing, revising — get a sentence instead, because
+ * "Wren commented" is what the reader is scanning for, not `send_chat_message`.
+ */
+const FEED = {
+  send_chat_message: { state: 'say', verb: 'commented' },
+  write_document: { state: 'doc', verb: 'wrote document' },
+  update_document: { state: 'doc', verb: 'updated document' },
+  run_agent: { state: 'spawn', verb: null }
+} as const;
+
+export type FeedState = 'ok' | 'run' | 'spawn' | 'say' | 'doc';
+
+/** The state one tool call carries in the feed. */
+export const stateFor = (toolName: string): FeedState =>
+  FEED[toolName as keyof typeof FEED]?.state ?? 'ok';
+
+/**
+ * The name shown against one call. A sentence for the three that read as the
+ * agent acting in the thread, the raw tool name for the rest.
+ */
+export const nameFor = (agentName: string, toolName: string) => {
+  const verb = FEED[toolName as keyof typeof FEED]?.verb;
+  return verb ? `${agentName} ${verb}` : toolName;
 };

@@ -66,10 +66,12 @@ describe('document tools are scoped to the thread', () => {
       listSkills: async () => [],
       getSkill: async () => null,
       listAgents: async () => [],
-      getAgent: async () => null
+      getAgent: async () => null,
+      appendStep: async () => 'step-1',
+      setAgentStatusTitle: async () => undefined
     }));
     const { workerTools } = await import('../../src/lib/server/ai/tools');
-    return workerTools({ threadId: 't1', agentId: 'kestrel', tag: 'w' });
+    return workerTools({ threadId: 't1', agentId: 'kestrel', agentName: 'Kestrel', tag: 'w' });
   };
 
   it('lists only this thread’s documents', async () => {
@@ -123,10 +125,12 @@ describe('write_document refuses a name the thread already uses', () => {
       listSkills: async () => [],
       getSkill: async () => null,
       listAgents: async () => [],
-      getAgent: async () => null
+      getAgent: async () => null,
+      appendStep: async () => 'step-1',
+      setAgentStatusTitle: async () => undefined
     }));
     const { workerTools } = await import('../../src/lib/server/ai/tools');
-    return workerTools({ threadId: 't1', agentId: 'orchestrator', tag: 'w' });
+    return workerTools({ threadId: 't1', agentId: 'orchestrator', agentName: 'Rook', tag: 'w' });
   };
 
   const existing = [{ id: 'eval-protocol', name: 'eval-protocol', threadId: 't1' }];
@@ -262,10 +266,12 @@ describe('the document name field asks for a title, not a filename', () => {
       listSkills: async () => [],
       getSkill: async () => null,
       listAgents: async () => [],
-      getAgent: async () => null
+      getAgent: async () => null,
+      appendStep: async () => 'step-1',
+      setAgentStatusTitle: async () => undefined
     }));
     const { workerTools } = await import('../../src/lib/server/ai/tools');
-    const tools = workerTools({ threadId: 't1', agentId: 'a1', tag: 'w' });
+    const tools = workerTools({ threadId: 't1', agentId: 'a1', agentName: 'Ash', tag: 'w' });
     return {
       write: describeOf(tools.write_document.inputSchema, 'name'),
       rename: describeOf(tools.update_document.inputSchema, 'name')

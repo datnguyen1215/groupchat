@@ -66,6 +66,26 @@ Reading the web:
   close the browser when you are finished.
 `.trim();
 
+/**
+ * The status line is a separate channel from chat, and the prompt has to say so
+ * outright. `CHAT_RULES` forbids announcing what you are about to do, and the
+ * worker prompt says nobody wants to hear which tools you ran — an agent
+ * applying those rules to `set_status` stops calling it, and applying them the
+ * other way starts narrating in chat. Naming the two channels and who reads
+ * each is what keeps them apart.
+ */
+const STATUS = `
+Saying what you are doing:
+- Call set_status before each piece of work. A few words, present tense:
+  "Reading the Q3 vendor quotes", "Comparing payment terms".
+- Update it when you move on to something different. A stale status is worse than none.
+- This is the progress line the human watches while waiting. It is not chat.
+  Nothing you put here is a message, and nobody replies to it.
+- It is the one place you do say what you are about to do. The no-preamble rule
+  is about chat. Keep announcements out of chat and put them here.
+- Name the work, not the tool. "Checking Acme's security posture", not "running web_search".
+`.trim();
+
 const SPEAKING = `
 Call send_chat_message to speak. Call finish when you are done talking.
 Do not end your turn without calling finish.
@@ -81,6 +101,8 @@ ${DOCUMENT_RULES}
 ${DOCUMENT_TOOLS}
 
 ${BROWSING}
+
+${STATUS}
 
 ${SPEAKING}
 `.trim();
@@ -124,6 +146,10 @@ as intended.
 
 Do the work with your tools first, then report what you found in chat. Report the
 finding, not the process — nobody wants to hear which tools you ran.
+
+Your first call every turn is set_status, before you touch any other tool. The
+human is watching that line to see what you picked up. "Report the finding, not
+the process" is a rule about chat; the status line is where the process goes.
 
 ${HOUSE_STYLE}
 `.trim();

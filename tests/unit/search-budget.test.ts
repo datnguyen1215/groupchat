@@ -17,7 +17,9 @@ const build = async (searched: Set<string>, hits: unknown[] = []) => {
     appendMessage: async () => 'entry-1',
     listSkills: async () => [],
     getSkill: async () => null,
-    listAgents: async () => []
+    listAgents: async () => [],
+    appendStep: async () => 'step-1',
+    setAgentStatusTitle: async () => undefined
   }));
 
   const search = vi.fn(async () => hits);
@@ -29,7 +31,7 @@ const build = async (searched: Set<string>, hits: unknown[] = []) => {
   }));
 
   const { workerTools } = await import('../../src/lib/server/ai/tools');
-  const tools = workerTools({ threadId: 't1', agentId: 'a1', tag: 'w', searched });
+  const tools = workerTools({ threadId: 't1', agentId: 'a1', agentName: 'Ash', tag: 'w', searched });
 
   /** The tool's second argument is the SDK's execution options; the budget
    * reads none of them, so an empty one is cast through rather than faked. */

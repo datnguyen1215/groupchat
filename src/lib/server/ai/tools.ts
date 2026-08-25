@@ -5,6 +5,7 @@ import { documents, skills } from '../db/schema';
 import { eq, sql } from 'drizzle-orm';
 import {
   appendMessage,
+  appendStep,
   createDocument,
   deleteDocument,
   getDocument,
@@ -12,12 +13,13 @@ import {
   listAgents,
   listDocuments,
   listSkills,
+  setAgentStatusTitle,
   updateDocument
 } from '../repo';
 import { logger, since } from '../logger';
 import { researchTools, search } from '../research';
 import { browserTools } from '../browser';
-import { summarise } from './detail';
+import { SILENT, nameFor, stateFor, summarise } from './detail';
 
 const log = logger('tool');
 
@@ -26,6 +28,11 @@ const log = logger('tool');
  * result with its duration. Applied once to the whole tool set rather than
  * written into each tool, so a new tool is traced the day it is added and no
  * two tools log in different shapes.
+ *
+ * It also writes the step row. That happens here, as each call finishes, rather
+ * than in a sweep after the turn: the presence row shows the steps an agent has
+ * already completed, and a row written at the end of the turn arrives after the
+ * only moment it had a reader.
  *
  * Input is logged in full at `debug` — a document body belongs there, not in
  * the default stream — and summarised at `info` by `summarise`.
@@ -42,8 +49,18 @@ const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T =>
       log.debug({ ...base, input }, 'call input');
 
       /** Both paths record: a call that threw still took the time it took. */
-      const record = () => {
-        if (ctx.timings && options?.toolCallId) ctx.timings.set(options.toolCallId, since(start));
+      const record = async () => {
+        if (SILENT.has(name)) return;
+        const state = stateFor(name);
+        await appendStep({
+          threadId: ctx.threadId,
+          groupLabel: ctx.agentName,
+          state,
+          name: nameFor(ctx.agentName, name),
+          detail: summarise(input),
+          durationMs: since(start),
+          badge: state === 'spawn' ? 'agent' : undefined
+        });
       };
 
       try {
@@ -55,11 +72,11 @@ const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T =>
           failed ? 'rejected' : 'ok'
         );
         log.debug({ ...base, result }, 'call result');
-        record();
+        await record();
         return result;
       } catch (error) {
         log.error({ ...base, ms: since(start), err: error }, 'threw');
-        record();
+        await record();
         throw error;
       }
     };
@@ -80,18 +97,9 @@ const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T =>
 export type ToolContext = {
   threadId: string;
   agentId: string;
+  /** The step row's `groupLabel` — which agent's run this call belongs to. */
+  agentName: string;
   tag: string;
-  /**
-   * Where `traced` records how long each call took. The step rows are written
-   * after the turn ends, by which point the durations are gone —
-   * `result.steps` carries the calls but not their timings.
-   *
-   * Keyed by `toolCallId` rather than by position, because the calls in one
-   * step run concurrently and finish in an order `result.steps` does not
-   * predict. The id is unique for the whole turn — the `call_NN` prefix
-   * restarts each step, but the suffix after it does not repeat.
-   */
-  timings?: Map<string, number>;
   /**
    * The queries this turn has already run, lowercased. A fresh `ctx` is built
    * per turn in `loop.ts`, so the set is turn-scoped without anything having to
@@ -99,6 +107,13 @@ export type ToolContext = {
    */
   searched?: Set<string>;
 };
+
+/**
+ * The presence row is one line beside an avatar. Past this the title is
+ * ellipsised there anyway, and the cap is what stops the model writing a
+ * sentence into a field that renders as a label.
+ */
+const STATUS_TITLE_MAX = 60;
 
 /**
  * How many distinct searches one turn may run.
@@ -378,6 +393,28 @@ const writeTools = (ctx: ToolContext) => ({
         ...withoutDocEcho(paragraphs, docId)
       });
       return { posted: true };
+    }
+  }),
+
+  set_status: tool({
+    description:
+      'Say what you are working on right now, in a few words. Call this before each ' +
+      'piece of work so the people watching can see what you are doing. This is not ' +
+      'chat — nobody is replying to it, and it does not count as speaking.',
+    inputSchema: z.object({
+      title: z
+        .string()
+        .max(STATUS_TITLE_MAX)
+        .describe(
+          'A short phrase naming the work, like "Comparing payment terms" or ' +
+            '"Reading the Q3 vendor quotes". Present tense. No trailing full stop.'
+        )
+    }),
+    execute: async ({ title }) => {
+      const clean = title.trim().slice(0, STATUS_TITLE_MAX);
+      if (!clean) return { error: 'A status needs a title.' };
+      await setAgentStatusTitle(ctx.agentId, clean);
+      return { ok: true };
     }
   }),
 

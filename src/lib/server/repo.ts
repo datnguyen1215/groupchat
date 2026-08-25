@@ -543,6 +543,12 @@ export const setAgentStatus = async (
   threadId: string | null = null
 ) => {
   /**
+   * The title is the agent's own words about the work it is on. That work is
+   * over whenever the label changes, so the title is cleared here and set only
+   * by `setAgentStatusTitle`. Leaving it would caption the next phase of the
+   * turn with the last one's description.
+   */
+  /**
    * Read before write: going idle passes no thread, but the presence row that
    * has to disappear lives in whichever thread the agent was busy in.
    */
@@ -556,6 +562,7 @@ export const setAgentStatus = async (
     .set({
       status,
       statusLabel,
+      statusTitle: null,
       busyThreadId: status === 'busy' ? threadId : null,
       updatedAt: new Date()
     })
@@ -565,6 +572,26 @@ export const setAgentStatus = async (
 
   for (const id of new Set([threadId, before?.busyThreadId].filter(Boolean) as string[]))
     publish({ scope: 'thread', threadId: id });
+};
+
+/**
+ * The live one-line title under the presence row. Separate from `setAgentStatus`
+ * because it fires far more often — several times per turn, from the `set_status`
+ * tool — and must not disturb `status`, `statusLabel` or `busyThreadId`.
+ *
+ * A title on an idle agent would render nowhere and outlive its turn, so the
+ * write is scoped to `busy` rows and a late call after the turn ends is a no-op.
+ */
+export const setAgentStatusTitle = async (agentId: string, title: string) => {
+  const [row] = await db
+    .update(agents)
+    .set({ statusTitle: title, updatedAt: new Date() })
+    .where(and(eq(agents.id, agentId), eq(agents.status, 'busy')))
+    .returning({ threadId: agents.busyThreadId });
+
+  if (!row) return;
+  log.info({ agentId, statusTitle: title }, 'agent status title');
+  if (row.threadId) publish({ scope: 'thread', threadId: row.threadId });
 };
 
 /**
@@ -582,7 +609,7 @@ export const clearStaleBusy = async (olderThanMs = 5 * 60_000) => {
 
   await db
     .update(agents)
-    .set({ status: 'idle', statusLabel: 'Idle', busyThreadId: null })
+    .set({ status: 'idle', statusLabel: 'Idle', statusTitle: null, busyThreadId: null })
     .where(and(eq(agents.status, 'busy'), lt(agents.updatedAt, cutoff)));
 
   /** Warn, not info: reaching here means a turn died without its `finally`. */
@@ -591,6 +618,9 @@ export const clearStaleBusy = async (olderThanMs = 5 * 60_000) => {
   for (const id of new Set(stale.map(row => row.busyThreadId).filter(Boolean) as string[]))
     publish({ scope: 'thread', threadId: id });
 };
+
+/** How many finished steps the presence row shows under the live title. */
+const PRESENCE_STEPS = 3;
 
 /**
  * Presence rows: who is mid-turn in this thread, and the last step each ran.
@@ -613,21 +643,49 @@ export const listBusyAgents = async (threadId: string) => {
     );
   if (!rows.length) return [];
 
+  /**
+   * Scoped per agent by `groupLabel`, not one row for the whole thread. Two
+   * agents run at once often enough that a thread-wide "last step" captions
+   * both presence rows with whichever one happened to write last.
+   */
   const recent = await db
     .select()
     .from(steps)
-    .where(eq(steps.threadId, threadId))
-    .orderBy(desc(steps.seq))
-    .limit(1);
-  const last = recent[0];
+    .where(
+      and(
+        eq(steps.threadId, threadId),
+        inArray(
+          steps.groupLabel,
+          rows.map(r => r.name)
+        )
+      )
+    )
+    .orderBy(desc(steps.seq));
 
-  return rows.map(r => ({
-    id: r.id,
-    name: r.name,
-    initials: r.initials,
-    color: r.color,
-    tag: r.role,
-    statusLabel: r.statusLabel,
-    lastStep: last ? { name: last.name, detail: last.detail } : null
-  }));
+  return rows.map(r => {
+    const mine = recent.filter(step => step.groupLabel === r.name);
+    return {
+      id: r.id,
+      name: r.name,
+      initials: r.initials,
+      color: r.color,
+      tag: r.role,
+      statusLabel: r.statusLabel,
+      statusTitle: r.statusTitle,
+      /**
+       * Newest last, so the list reads top-to-bottom in the order the work
+       * happened. Capped at three: the presence row sits above the composer,
+       * and an uncapped list on a long turn pushes it off screen.
+       */
+      steps: mine
+        .slice(0, PRESENCE_STEPS)
+        .reverse()
+        .map(step => ({
+          id: step.id,
+          name: step.name,
+          detail: step.detail,
+          durationMs: step.durationMs
+        }))
+    };
+  });
 };

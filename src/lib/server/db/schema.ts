@@ -24,6 +24,12 @@ export const agents = pgTable('agents', {
   status: agentStatus('status').notNull().default('idle'),
   statusLabel: text('status_label').notNull().default('Idle'),
   /**
+   * What the agent says it is doing, in its own words — "Comparing payment terms".
+   * Written by the `set_status` tool, cleared when the turn ends. Distinct from
+   * `statusLabel`, which is a fixed vocabulary the presence query filters on.
+   */
+  statusTitle: text('status_title'),
+  /**
    * Which thread this agent is busy in; null when idle. An agent is a global
    * row, so `status` alone would render a presence row in every thread at once.
    */
