@@ -50,6 +50,53 @@ export const STATE_FILE = `${process.env.HOME}/tmp/groupchat/browser-state.json`
  */
 export const OUTPUT_DIR = `${process.env.HOME}/tmp/groupchat/browser-output`;
 
+/**
+ * What the browser reports itself as.
+ *
+ * Headless Chromium announces `HeadlessChrome/...` in its user agent, which is
+ * the first thing a site checks when it wants to turn automation away. The
+ * version is taken from the browser actually running rather than written down
+ * here: a user agent claiming a version the browser does not have is its own
+ * signal, and a pinned string would drift every time Playwright updates.
+ *
+ * This is politeness towards ordinary sites that sniff the UA, not a disguise.
+ * The server already hides `navigator.webdriver`, so what is left is the
+ * deeper fingerprinting — canvas, WebGL, timing — that no flag addresses.
+ */
+const userAgent = async () => {
+  const { chromium } = await import('playwright');
+
+  /** One short launch per server start, to ask the browser its own version. */
+  const build = await chromium
+    .launch({ headless: true })
+    .then(async browser => {
+      const version = browser.version();
+      await browser.close();
+      return version.match(/[\d.]+/)?.[0];
+    })
+    .catch(cause => {
+      log.warn({ err: cause }, 'could not read browser version');
+      return undefined;
+    });
+
+  /** No version means no claim: better the default UA than a false one. */
+  if (!build) return undefined;
+
+  return (
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
+    `Chrome/${build} Safari/537.36`
+  );
+};
+
+/**
+ * The window size the pages are laid out at.
+ *
+ * The headless default is smaller than any real desktop, which changes what a
+ * responsive site renders — an agent reading a phone layout of a page it was
+ * asked about is reading the wrong page.
+ */
+const VIEWPORT = '1920x1080';
+
 /** How long to wait for the server to report itself listening. */
 const STARTUP_TIMEOUT_MS = 30_000;
 
@@ -126,8 +173,11 @@ const ensureState = () => {
   log.info({ file: STATE_FILE }, 'empty browser state created');
 };
 
-const launch = (): Promise<Server> =>
-  new Promise((resolve, reject) => {
+const launch = async (): Promise<Server> => {
+  /** Resolved before the spawn, because it needs the browser's own version. */
+  const agent = await userAgent();
+
+  return new Promise((resolve, reject) => {
     const start = Date.now();
     ensureState();
 
@@ -147,6 +197,9 @@ const launch = (): Promise<Server> =>
         /** DeepSeek reads no images, so a screenshot payload is pure waste. */
         '--image-responses',
         'omit',
+        '--viewport-size',
+        VIEWPORT,
+        ...(agent ? ['--user-agent', agent] : []),
         '--output-dir',
         OUTPUT_DIR,
         '--no-sandbox'
@@ -206,6 +259,7 @@ const launch = (): Promise<Server> =>
       if (store[GLOBAL_KEY]) store[GLOBAL_KEY] = undefined;
     });
   });
+};
 
 /**
  * The running server, started if it is not already.
