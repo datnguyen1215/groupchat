@@ -36,9 +36,38 @@
   const { entries, busy, onopenactivity }: Props = $props();
 
   const barColor = { ok: 'bg-ok', run: 'bg-run', spawn: 'bg-accent' };
+
+  let viewport: HTMLDivElement;
+
+  /* Stick to the bottom unless the user has scrolled up to read history. */
+  let pinned = $state(true);
+
+  const NEAR_BOTTOM = 80;
+
+  const onscroll = () => {
+    const gap = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    pinned = gap < NEAR_BOTTOM;
+  };
+
+  /**
+   * Re-runs whenever the stream grows, and scrolls after the DOM has the new
+   * entry. The two counts are read for their dependencies, not their values:
+   * an effect only re-runs on what it read, so removing them stops the scroll.
+   */
+  $effect(() => {
+    void entries.length;
+    void busy.length;
+    if (!pinned) return;
+    viewport.scrollTop = viewport.scrollHeight;
+  });
 </script>
 
-<div class="flex-1 overflow-y-auto pt-[30px] pb-[10px]">
+<div
+  bind:this={viewport}
+  {onscroll}
+  data-testid="stream"
+  class="flex-1 overflow-y-auto pt-[30px] pb-[10px]"
+>
   <div class="mx-auto max-w-[620px] px-6">
     {#each entries as entry (entry.id)}
       {#if entry.kind === 'activity'}
