@@ -28,6 +28,12 @@
           <li class="mb-[6px]"><Inline text={item} /></li>
         {/each}
       </ul>
+    {:else if block.type === 'ordered'}
+      <ol class="mb-[14px] list-decimal pl-[22px]">
+        {#each block.items as item, j (j)}
+          <li class="mb-[6px]"><Inline text={item} /></li>
+        {/each}
+      </ol>
     {:else if block.type === 'quote'}
       <blockquote class="mb-[14px] border-l-[2.5px] border-accent pl-[15px] text-ink-2">
         <Inline text={block.text} />

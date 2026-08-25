@@ -46,6 +46,37 @@ describe('parseMarkdown', () => {
     expect(parseMarkdown('- a\n- b\n- c')).toEqual([{ type: 'list', items: ['a', 'b', 'c'] }]);
   });
 
+  it('collects consecutive numbered lines into one ordered list', () => {
+    expect(parseMarkdown('1. a\n2. b\n3. c')).toEqual([
+      { type: 'ordered', items: ['a', 'b', 'c'] }
+    ]);
+  });
+
+  it('numbers the items itself rather than trusting the source', () => {
+    /* A source that restarts or skips still renders as a well-formed list. */
+    expect(parseMarkdown('1. a\n1. b\n5. c')).toEqual([
+      { type: 'ordered', items: ['a', 'b', 'c'] }
+    ]);
+  });
+
+  it('does not absorb a numbered item into the paragraph above it', () => {
+    /*
+     * The regression: with no ordered rule the numbered lines fell through to
+     * the paragraph branch and the continuation guard joined all of them, and
+     * the intro line, into one collapsed blob.
+     */
+    expect(parseMarkdown('Three things hold:\n1. first\n2. second')).toEqual([
+      { type: 'paragraph', text: 'Three things hold:' },
+      { type: 'ordered', items: ['first', 'second'] }
+    ]);
+  });
+
+  it('keeps a decimal inside a sentence out of an ordered list', () => {
+    expect(parseMarkdown('It eats 60-100% of a $10/mo plan.')).toEqual([
+      { type: 'paragraph', text: 'It eats 60-100% of a $10/mo plan.' }
+    ]);
+  });
+
   it('joins a multi-line quote into one block', () => {
     expect(parseMarkdown('> one\n> two')).toEqual([{ type: 'quote', text: 'one two' }]);
   });
