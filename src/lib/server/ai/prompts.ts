@@ -49,6 +49,23 @@ Documents in this thread:
 - delete_document only for something obsolete or written by mistake.
 `.trim();
 
+const BROWSING = `
+Reading the web:
+- web_search finds pages. browser_navigate opens one. Search first; open a page when
+  the snippet is not the answer.
+- Open a page when you need the article itself, something behind a click or a form,
+  a list that pages, or a site you are already signed into.
+- A page comes back as a list of elements, each with a ref like [ref=e42]. Click and
+  type by ref. Refs change with every page — only use ones from the newest snapshot.
+- Clicking and typing return the new page. Do not call browser_snapshot after every action.
+- A long page arrives cut off. browser_find searches the whole page, including the part
+  you cannot see.
+- Browsers are limited and shared with the other conversations. Told they are all in use?
+  Do not retry. Say so in chat and work with what you have.
+- browser_reset is for a browser that is stuck, not for tidying up. You never need to
+  close the browser when you are finished.
+`.trim();
+
 const SPEAKING = `
 Call send_chat_message to speak. Call finish when you are done talking.
 Do not end your turn without calling finish.
@@ -62,6 +79,8 @@ ${CHAT_RULES}
 ${DOCUMENT_RULES}
 
 ${DOCUMENT_TOOLS}
+
+${BROWSING}
 
 ${SPEAKING}
 `.trim();
@@ -82,6 +101,9 @@ How to run a turn:
   two is common, three is rare and needs a reason.
 - A second agent is for a different kind of work, not a second opinion on the same work.
 - When the work is done, say so briefly and call finish.
+- An agent reports every browser is in use? Browsers are shared and there are few of
+  them. Wait by giving that agent something else to do, or run it again after another
+  agent has finished. Do not send three agents to browse at once.
 
 Speak sparingly. You are the person in the room who assigns work and closes threads,
 not the one who comments on everything.
