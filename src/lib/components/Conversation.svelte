@@ -74,7 +74,7 @@
   data-testid="stream"
   class="flex-1 overflow-y-auto pt-[30px] pb-[10px]"
 >
-  <div class="mx-auto max-w-[620px] px-6">
+  <div class="px-6">
     {#each entries as entry (entry.id)}
       {#if entry.kind === 'error'}
         <!-- A failure, not an agent talking: no avatar, no name, no tag. -->
@@ -105,7 +105,7 @@
             <span class="ml-auto text-[11px] text-ink-3">{entry.time}</span>
           </header>
 
-          <div class="max-w-[56ch] pl-[30px] text-[13.5px] text-ink">
+          <div class="pl-[30px] text-[13.5px] text-ink">
             <ChatMarkdown paragraphs={entry.paragraphs} />
 
             {#if entry.docId}

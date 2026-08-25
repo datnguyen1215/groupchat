@@ -14,7 +14,7 @@
   };
 </script>
 
-<div class="max-w-[62ch] text-[14px]/[1.7] text-[#d6d6d4]">
+<div class="text-[14px]/[1.7] text-[#d6d6d4]">
   {#each blocks as block, i (i)}
     {#if block.type === 'heading'}
       <svelte:element this={`h${block.level}`} class={headingClass[block.level]}>

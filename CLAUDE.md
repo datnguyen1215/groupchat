@@ -37,10 +37,13 @@
 
 ## Command output
 
-- Redirect long-running commands to a log file: `npm test > ~/tmp/test.log 2>&1`.
+All scratch output lives under `~/tmp/groupchat/`. Never in the repo.
+
+- Redirect long-running commands to a log file: `npm test > ~/tmp/groupchat/test.log 2>&1`.
 - Applies to test runs, builds, dev servers, migrations — anything noisy.
-- Name the file after the task: `~/tmp/groupchat-<task>.log`.
+- Name the file after the task: `~/tmp/groupchat/<task>.log`.
 - Read the log to inspect results. Tell the user the path when it matters.
+- Screenshots go there too. Playwright's `outputDir` already points at `~/tmp/groupchat/test-results/`.
 
 ## Live updates
 
@@ -107,7 +110,7 @@ Before merging a branch into `master`, in order:
 Multi-agent environment. Never edit the main checkout directly.
 
 - Create a git worktree for each session's changes.
-- Put it under `~/tmp/` — e.g. `~/tmp/groupchat-<task>`.
+- Put it under `~/tmp/groupchat/worktrees/` — e.g. `~/tmp/groupchat/worktrees/<task>`.
 - Do all work in that worktree.
 - Spawning agents? Tell each one the worktree path. They must work there too.
 - After merging into `master`: remove the worktree (`git worktree remove`) and delete the branch (`git branch -d`).

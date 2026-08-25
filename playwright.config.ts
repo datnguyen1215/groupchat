@@ -1,3 +1,5 @@
+import os from 'node:os';
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { SCHEMA } from './tests/support/run';
 import { STORAGE_STATE } from './tests/support/auth';
@@ -19,8 +21,11 @@ const HOST = process.env.TEST_HOST || '127.0.0.1';
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  /* Traces and error context, like the cookie, cannot share a path across runs. */
-  outputDir: `test-results/${SCHEMA}`,
+  /*
+   * Traces and error context, like the cookie, cannot share a path across runs.
+   * They live outside the repo so a run never leaves artifacts in the checkout.
+   */
+  outputDir: path.join(os.homedir(), 'tmp', 'groupchat', 'test-results', SCHEMA),
   globalSetup: './tests/support/global-setup.ts',
   globalTeardown: './tests/support/global-teardown.ts',
   fullyParallel: true,

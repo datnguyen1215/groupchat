@@ -38,7 +38,8 @@ describe('e2e run isolation', () => {
   it('keys the cookie file and output dir on the run, not a fixed path', () => {
     /* A shared cookie points one run at another run's schema. */
     expect(auth).toContain('tests/.auth/${SCHEMA}.json');
-    expect(config).toContain('outputDir: `test-results/${SCHEMA}`');
+    /* Where the artifacts live is free to move; that they are per-run is not. */
+    expect(config).toMatch(/outputDir:.*SCHEMA/);
   });
 
   it('has every helper read the one resolved schema', () => {
