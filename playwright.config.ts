@@ -12,7 +12,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   globalSetup: './tests/support/global-setup.ts',
   fullyParallel: true,
-  workers: process.env.CI ? 2 : undefined,
+  workers: 2,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'line' : [['list']],
