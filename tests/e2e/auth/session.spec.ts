@@ -53,3 +53,18 @@ test('signing out ends the session and re-gates the app', async ({ page }) => {
   await page.goto('/agents');
   await expect(page).toHaveURL(/\/login/);
 });
+
+/**
+ * Cookies key on host, not port, so every app served from `localhost` shares one
+ * jar. On better-auth's default name this app and a sibling would overwrite each
+ * other's token on every sign-in, and logging into one would sign out the other.
+ */
+test('the session cookie is namespaced to this app', async ({ page, context }) => {
+  await signIn(page);
+
+  const cookies = await context.cookies();
+  const names = cookies.map(c => c.name);
+
+  expect(names).toContain('groupchat.session_token');
+  expect(names).not.toContain('better-auth.session_token');
+});
