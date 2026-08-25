@@ -229,3 +229,72 @@ describe('withoutDocEcho', () => {
     expect(withoutDocEcho([say, '   '], undefined).paragraphs).toEqual([say]);
   });
 });
+
+/**
+ * Document names are titles, not filenames.
+ *
+ * They were arriving as "eval-protocol-v1" because the `name` field's own
+ * description said "a short file name" and gave a kebab-case example. Models
+ * copy the example. Nothing downstream forced it — `documents.name` is plain
+ * text and a document's id is a UUID, never a slug of its name — so the fix
+ * is the wording the model reads, and that wording is what these assert.
+ */
+describe('the document name field asks for a title, not a filename', () => {
+  /**
+   * `tool()` widens `inputSchema` to the SDK's `FlexibleSchema`, which hides
+   * zod's `shape`. The object underneath is still the zod one these were
+   * built from, so the cast reads what the model is actually sent.
+   */
+  const describeOf = (schema: unknown, field: string) => {
+    const shape = (schema as { shape?: Record<string, { description?: string }> }).shape;
+    return shape?.[field]?.description ?? '';
+  };
+
+  const fields = async () => {
+    vi.resetModules();
+    vi.doMock('$env/dynamic/private', () => ({ env: {} }));
+    vi.doMock('../../src/lib/server/db', () => ({ db: {}, schema: {} }));
+    vi.doMock('../../src/lib/server/repo', () => ({
+      listDocuments: async () => [],
+      getDocument: async () => null,
+      createDocument: async () => 'doc-1',
+      appendMessage: async () => 'entry-1',
+      listSkills: async () => [],
+      getSkill: async () => null,
+      listAgents: async () => [],
+      getAgent: async () => null
+    }));
+    const { workerTools } = await import('../../src/lib/server/ai/tools');
+    const tools = workerTools({ threadId: 't1', agentId: 'a1', tag: 'w' });
+    return {
+      write: describeOf(tools.write_document.inputSchema, 'name'),
+      rename: describeOf(tools.update_document.inputSchema, 'name')
+    };
+  };
+
+  /** Guards the cast above: an empty description would pass the "not" assertions. */
+  it('reads a description at all', async () => {
+    const { write, rename } = await fields();
+    expect(write.length).toBeGreaterThan(0);
+    expect(rename.length).toBeGreaterThan(0);
+  });
+
+  it('does not call the name a file name', async () => {
+    const { write, rename } = await fields();
+    expect(write.toLowerCase()).not.toContain('file name');
+    expect(rename.toLowerCase()).not.toContain('file name');
+  });
+
+  it('gives an example with spaces rather than dashes', async () => {
+    const { write } = await fields();
+    const example = /"([^"]+)"/.exec(write)?.[1] ?? '';
+    expect(example).toContain(' ');
+    expect(example).not.toMatch(/\w-\w/);
+  });
+
+  it('asks for spaces on both the write and the rename path', async () => {
+    const { write, rename } = await fields();
+    expect(write.toLowerCase()).toContain('spaces');
+    expect(rename.toLowerCase()).toContain('spaces');
+  });
+});

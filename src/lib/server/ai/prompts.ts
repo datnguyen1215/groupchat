@@ -29,6 +29,8 @@ Rules for how you speak:
 const DOCUMENT_RULES = `
 How you write a document:
 - Write for someone who missed this thread. Not for the people who watched you work.
+- Name it the way you would title a document for a colleague: plain English, words
+  separated by spaces. "Eval Protocol v1", not "eval-protocol-v1". It is a title, not a filename.
 - Lead with the conclusion. The first line is the answer.
 - One claim per section. Evidence under it, or say plainly there is none.
 - Use a table when the content is comparable items.

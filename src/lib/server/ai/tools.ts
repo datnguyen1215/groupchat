@@ -214,7 +214,13 @@ const writeTools = (ctx: ToolContext) => ({
       'already covered, update that document instead of writing a second one. Returns the ' +
       'id, which you attach to a chat message with docId.',
     inputSchema: z.object({
-      name: z.string().describe('A short file name, e.g. "eval-protocol-v1".'),
+      name: z
+        .string()
+        .describe(
+          'A short title in plain English, e.g. "Eval Protocol v1". Words with spaces, ' +
+            'the way you would title a document for a colleague. Not a filename — no ' +
+            'dashes or underscores between words.'
+        ),
       body: z
         .string()
         .describe(
@@ -257,7 +263,10 @@ const writeTools = (ctx: ToolContext) => ({
     inputSchema: z.object({
       id: z.string().describe('The document id from list_documents or search_documents.'),
       body: z.string().describe('The full new markdown body. This replaces the old body.'),
-      name: z.string().optional().describe('A new name, if it should be renamed.')
+      name: z
+        .string()
+        .optional()
+        .describe('A new title, if it should be renamed. Plain English with spaces.')
     }),
     execute: async ({ id, body, name }) => {
       const doc = await getDocument(id);
