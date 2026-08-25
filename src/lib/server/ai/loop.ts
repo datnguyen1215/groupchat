@@ -8,7 +8,7 @@ import { orchestratorTools, workerTools, type ToolContext } from './tools';
 import {
   BLOCKED,
   appendActivity,
-  appendMessage,
+  appendError,
   appendStep,
   listEntries,
   setAgentStatus
@@ -122,14 +122,18 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
     /** `finish` leaves no text, so the last thing said in chat is the report. */
     return result.text.trim() || `${agent.name} finished the task.`;
   } catch (error) {
-    /**
-     * Handed back as the report rather than rethrown: the orchestrator asked
-     * this agent for an answer, and "I failed" is an answer it can act on.
-     */
     log.error(
       { agentId, agentName: agent.name, threadId, ms: since(start), err: error },
       'worker failed'
     );
+
+    /** Shown in its own right, so the failure reaches the thread unparaphrased. */
+    await appendError({ threadId, line: `${agent.name} stopped — ${describe(error)}` });
+
+    /**
+     * Also handed back as the report rather than rethrown: the orchestrator
+     * asked this agent for an answer, and "I failed" is one it can act on.
+     */
     return `${agent.name} could not finish — ${describe(error)}.`;
   } finally {
     /** Always. A stuck `busy` row is a presence indicator that never clears. */
@@ -219,17 +223,13 @@ export const runOrchestrator = async (threadId: string) => {
     );
   } catch (error) {
     /**
-     * The turn is over and nobody is coming. Saying so in the thread is the
-     * only way the failure reaches the person who is waiting on a reply —
-     * there is no streaming channel to report it on.
+     * The turn is over and nobody is coming, so the failure has to land in the
+     * thread — it is the only way it reaches the person waiting on a reply.
+     * As an error entry, not a message: the orchestrator did not choose to say
+     * this, and dressing a crash up as its speech misreads what happened.
      */
     log.error({ agentId: orch.id, threadId, ms: since(start), err: error }, 'turn failed');
-    await appendMessage({
-      threadId,
-      authorId: orch.id,
-      tag: 'orch',
-      paragraphs: [`I could not run this turn — ${describe(error)}. Nothing was lost; try again.`]
-    });
+    await appendError({ threadId, line: sentence(describe(error)) });
   } finally {
     await setAgentStatus(orch.id, 'idle', 'Idle');
   }
@@ -240,8 +240,11 @@ export const runOrchestrator = async (threadId: string) => {
  *
  * Provider messages are never passed through. They quote request details back —
  * the auth error includes part of the API key — and whatever this returns is
- * stored as a message that anyone with access to the thread can read. So the
+ * stored on an entry that anyone with access to the thread can read. So the
  * status code picks from fixed wording, and the real error goes to the log.
+ *
+ * Returns a lowercase fragment: it is both the error entry's line and the tail
+ * of the report handed back to the orchestrator. `sentence` caps it for display.
  */
 export const describe = (error: unknown) => {
   const status = statusOf(error);
@@ -254,6 +257,10 @@ export const describe = (error: unknown) => {
 
   return 'something went wrong on our side';
 };
+
+/** A fragment from `describe` as a standalone line. */
+export const sentence = (fragment: string) =>
+  fragment.charAt(0).toUpperCase() + fragment.slice(1);
 
 const statusOf = (error: unknown) => {
   if (!error || typeof error !== 'object') return null;

@@ -17,7 +17,7 @@ vi.mock('../../src/lib/server/repo', () => ({
   BLOCKED: 'Delegating',
   setAgentStatus: (...args: unknown[]) => setAgentStatus(...args),
   appendActivity: vi.fn(),
-  appendMessage: vi.fn(),
+  appendError: vi.fn(),
   appendStep: vi.fn(),
   listEntries: vi.fn()
 }));
@@ -26,7 +26,8 @@ const {
   SPEECH,
   barsFor,
   delegating,
-  describe: errorLine
+  describe: errorLine,
+  sentence
 } = await import('../../src/lib/server/ai/loop');
 
 const { detailOf } = await import('../../src/lib/server/ai/detail');
@@ -134,6 +135,34 @@ describe('describe', () => {
   it('groups unrecognised 4xx and 5xx rather than passing them through', () => {
     expect(errorLine(providerError(418, 'teapot'))).toBe('the model provider rejected the request');
     expect(errorLine(providerError(599, 'unknown'))).toBe('the model provider is having trouble');
+  });
+});
+
+/**
+ * `describe` returns a lowercase fragment so it can tail the worker's report to
+ * the orchestrator. The error entry shows it alone, so it is capped there.
+ */
+describe('sentence', () => {
+  it('caps a fragment so it stands alone as a line', () => {
+    expect(sentence('the model provider timed out')).toBe('The model provider timed out');
+  });
+
+  it('caps every wording describe can produce', () => {
+    const statuses = [401, 403, 408, 429, 500, 504, 418, undefined];
+    for (const status of statuses) {
+      const line = sentence(errorLine(status ? { statusCode: status } : undefined));
+      expect(line[0]).toBe(line[0].toUpperCase());
+    }
+  });
+
+  it('leaves the rest of the fragment untouched', () => {
+    expect(sentence('the model provider is rate limiting us')).toBe(
+      'The model provider is rate limiting us'
+    );
+  });
+
+  it('tolerates an empty fragment', () => {
+    expect(sentence('')).toBe('');
   });
 });
 
