@@ -14,12 +14,11 @@ import {
   setAgentStatus
 } from '../repo';
 import { logger, since } from '../logger';
-import { detailOf } from './detail';
+import { SPEECH, detailOf } from './detail';
+
+export { SPEECH };
 
 const log = logger('agent');
-
-/** Tool calls that are the agent talking, not the agent working. */
-export const SPEECH = new Set(['send_chat_message', 'finish']);
 
 /** The sparkline for one turn: a bar per working tool call, speech excluded. */
 export const barsFor = (
@@ -47,10 +46,11 @@ const transcript = async (threadId: string) => {
  * the thread. Speech is excluded: `send_chat_message` already produced a
  * message entry, and showing it again as a tool call would double it up.
  */
-const recordSteps = async (
+export const recordSteps = async (
   threadId: string,
   label: string,
-  steps: { toolCalls?: { toolName: string; input: unknown }[] }[]
+  steps: { toolCalls?: { toolName: string; input: unknown }[] }[],
+  timings: number[] = []
 ) => {
   const bars = barsFor(steps);
   if (!bars.length) return;
@@ -66,7 +66,13 @@ const recordSteps = async (
       state: bars[i],
       name: call.toolName,
       detail: detailOf(call.input),
-      durationMs: null,
+      /**
+       * `traced` pushes one entry per working call, in the order they ran, so
+       * the indexes line up with `working`. A short turn can still come up
+       * empty — a call that never reached the wrapper has no timing, and the
+       * row renders as running rather than claiming a duration it never had.
+       */
+      durationMs: timings[i] ?? null,
       badge: bars[i] === 'spawn' ? 'agent' : undefined
     });
 
@@ -94,7 +100,8 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
   log.info({ agentId, agentName: agent.name, threadId, task }, 'worker start');
 
   try {
-    const ctx: ToolContext = { threadId, agentId, tag: agent.role || 'agent' };
+    const timings: number[] = [];
+    const ctx: ToolContext = { threadId, agentId, tag: agent.role || 'agent', timings };
     const result = await generateText({
       model: chatModel,
       providerOptions: noThinking,
@@ -104,7 +111,7 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
       stopWhen: stepCountIs(MAX_STEPS)
     });
 
-    await recordSteps(threadId, agent.name, result.steps);
+    await recordSteps(threadId, agent.name, result.steps, timings);
     log.info(
       {
         agentId,
@@ -196,7 +203,8 @@ export const runOrchestrator = async (threadId: string) => {
   log.info({ agentId: orch.id, agentName: orch.name, threadId }, 'turn start');
 
   try {
-    const ctx: ToolContext = { threadId, agentId: orch.id, tag: 'orch' };
+    const timings: number[] = [];
+    const ctx: ToolContext = { threadId, agentId: orch.id, tag: 'orch', timings };
     const result = await generateText({
       model: chatModel,
       providerOptions: noThinking,
@@ -208,7 +216,7 @@ export const runOrchestrator = async (threadId: string) => {
       stopWhen: stepCountIs(MAX_STEPS)
     });
 
-    await recordSteps(threadId, orch.name, result.steps);
+    await recordSteps(threadId, orch.name, result.steps, timings);
     log.info(
       {
         agentId: orch.id,
@@ -259,8 +267,7 @@ export const describe = (error: unknown) => {
 };
 
 /** A fragment from `describe` as a standalone line. */
-export const sentence = (fragment: string) =>
-  fragment.charAt(0).toUpperCase() + fragment.slice(1);
+export const sentence = (fragment: string) => fragment.charAt(0).toUpperCase() + fragment.slice(1);
 
 const statusOf = (error: unknown) => {
   if (!error || typeof error !== 'object') return null;

@@ -25,6 +25,7 @@ vi.mock('../../src/lib/server/repo', () => ({
 const {
   SPEECH,
   barsFor,
+  recordSteps,
   delegating,
   describe: errorLine,
   sentence
@@ -32,7 +33,9 @@ const {
 
 const { detailOf } = await import('../../src/lib/server/ai/detail');
 
-const call = (toolName: string) => ({ toolName });
+const repoMock = await import('../../src/lib/server/repo');
+
+const call = (toolName: string) => ({ toolName, input: {} });
 
 describe('barsFor', () => {
   it('draws one bar per working tool call', () => {
@@ -225,5 +228,52 @@ describe('delegating', () => {
     await delegating('orch', 't1', async () => null);
 
     expect(statuses()).toEqual(['Delegating', 'Thinking']);
+  });
+});
+
+/**
+ * Step rows carry how long each call took. They are written after the turn
+ * ends — the SDK's `steps` carry the calls but not their timings — so the
+ * durations come from the array `traced` fills as the calls run.
+ *
+ * A row with no timing renders as "running", which is right for a call still
+ * in flight and wrong for one that finished. Every completed call must land a
+ * number.
+ */
+describe('recordSteps durations', () => {
+  const appendStep = vi.mocked(repoMock.appendStep);
+
+  const turn = [{ toolCalls: [call('search_documents'), call('write_document')] }];
+
+  beforeEach(() => appendStep.mockClear());
+
+  const durations = () => appendStep.mock.calls.map(([arg]) => arg.durationMs);
+
+  it('gives each working call the duration traced recorded', async () => {
+    await recordSteps('t1', 'Wren', turn, [12, 3400]);
+    expect(durations()).toEqual([12, 3400]);
+  });
+
+  it('leaves a call without a timing null rather than borrowing one', async () => {
+    await recordSteps('t1', 'Wren', turn, [12]);
+    expect(durations()).toEqual([12, null]);
+  });
+
+  it('records nothing rather than guessing when no timings arrived', async () => {
+    await recordSteps('t1', 'Wren', turn);
+    expect(durations()).toEqual([null, null]);
+  });
+
+  it('keeps timings aligned when the turn also contains speech', async () => {
+    /** `traced` skips speech, so the array holds only the working calls. */
+    const mixed = [
+      { toolCalls: [call('search_documents'), call('send_chat_message'), call('write_document')] }
+    ];
+    await recordSteps('t1', 'Wren', mixed, [12, 3400]);
+    expect(durations()).toEqual([12, 3400]);
+    expect(appendStep.mock.calls.map(([arg]) => arg.name)).toEqual([
+      'search_documents',
+      'write_document'
+    ]);
   });
 });

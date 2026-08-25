@@ -143,3 +143,27 @@ describe('parseInline', () => {
     expect(parseInline('')).toEqual([]);
   });
 });
+
+/**
+ * Chat messages arrive as paragraphs and are joined before parsing, so a list
+ * an agent wrote across several paragraphs still parses as one list.
+ */
+describe('chat messages parse as markdown', () => {
+  it('turns a run of dashed lines into one list', () => {
+    const blocks = parseMarkdown(['Three problems:', '- one\n- two\n- three'].join('\n\n'));
+    expect(blocks).toEqual([
+      { type: 'paragraph', text: 'Three problems:' },
+      { type: 'list', items: ['one', 'two', 'three'] }
+    ]);
+  });
+
+  it('leaves ordinary prose as paragraphs', () => {
+    const blocks = parseMarkdown(['First point.', 'Second point.'].join('\n\n'));
+    expect(blocks.every(b => b.type === 'paragraph')).toBe(true);
+  });
+
+  it('keeps a dash inside a sentence out of a list', () => {
+    const blocks = parseMarkdown('recall@k - the honest metric');
+    expect(blocks[0].type).toBe('paragraph');
+  });
+});

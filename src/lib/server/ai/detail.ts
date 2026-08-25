@@ -1,4 +1,14 @@
 /**
+ * Tool calls that are the agent talking, not the agent working. Speech is
+ * already an entry in the thread, so it is left out of the step rows and the
+ * sparkline.
+ *
+ * Here rather than in `loop.ts` for the same reason `detailOf` is: `tools.ts`
+ * needs it too, and `loop.ts` already imports `tools.ts`.
+ */
+export const SPEECH = new Set(['send_chat_message', 'finish']);
+
+/**
  * A one-line summary of a tool's input: the activity drawer's detail column,
  * and the same summary the tool log carries at `info`.
  *

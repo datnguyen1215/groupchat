@@ -4,7 +4,7 @@
   import { overlay } from '$lib/state/overlay.svelte';
   import Avatar from './Avatar.svelte';
   import Icon from './Icon.svelte';
-  import Inline from './Inline.svelte';
+  import ChatMarkdown from './ChatMarkdown.svelte';
   import PresenceRow from './PresenceRow.svelte';
 
   type Entry = {
@@ -123,9 +123,7 @@
           </header>
 
           <div class="max-w-[56ch] pl-[30px] text-[13.5px] text-ink">
-            {#each entry.paragraphs as paragraph, i (i)}
-              <p class:mt-[7px]={i > 0}><Inline text={paragraph} /></p>
-            {/each}
+            <ChatMarkdown paragraphs={entry.paragraphs} />
 
             {#if entry.docId}
               {@const doc = (page.data.documents as Doc[]).find(d => d.id === entry.docId)}

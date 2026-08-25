@@ -13,7 +13,7 @@ import {
   uniqueId
 } from '../repo';
 import { logger, since } from '../logger';
-import { detailOf } from './detail';
+import { SPEECH, detailOf } from './detail';
 
 const log = logger('tool');
 
@@ -58,6 +58,11 @@ const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T =>
       log.info({ ...base, detail: summarise(input) }, 'call');
       log.debug({ ...base, input }, 'call input');
 
+      /** Both paths record: a call that threw still took the time it took. */
+      const record = () => {
+        if (ctx.timings && !SPEECH.has(name)) ctx.timings.push(since(start));
+      };
+
       try {
         const result = await run(input, options);
         /** A tool that returns `{ error }` failed the agent without throwing. */
@@ -67,9 +72,11 @@ const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T =>
           failed ? 'rejected' : 'ok'
         );
         log.debug({ ...base, result }, 'call result');
+        record();
         return result;
       } catch (error) {
         log.error({ ...base, ms: since(start), err: error }, 'threw');
+        record();
         throw error;
       }
     };
@@ -91,13 +98,44 @@ export type ToolContext = {
   threadId: string;
   agentId: string;
   tag: string;
+  /**
+   * Where `traced` records how long each call took, in call order. The step
+   * rows are written after the turn ends, by which point the durations are
+   * gone — the SDK's `steps` carry the calls but not their timings. Speech is
+   * excluded here for the same reason it is excluded from the rows.
+   */
+  timings?: number[];
 };
 
-/** Thread-only by default: an agent sees its own thread unless it asks wider. */
-const scopeSchema = z
-  .enum(['thread', 'all'])
-  .optional()
-  .describe('"thread" (default) for this thread only, "all" for every thread.');
+/** Escapes a value for embedding in a `RegExp`. Document ids are slugs, but not guaranteed. */
+const escapeRe = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Separates a document-id echo from the message text.
+ *
+ * Models handle the attachment two ways, and both need cleaning up. Some fill
+ * `docId` correctly and then write the id into the text as well, which renders
+ * as a stray line above the chip that already names the document. Others write
+ * the id into the text *instead* of passing the field, so the document is left
+ * with no chip at all and the line is the only reference to it.
+ *
+ * So the echo is always dropped from the text, and when no field was passed
+ * the id it names is adopted as the attachment. Instructing against this in
+ * the tool description did not stop either habit.
+ */
+const DOC_ECHO = /^\s*doc(?:ument)?[ _]?id\s*[:=]\s*"?([\w.-]+)"?\s*$/i;
+
+export const withoutDocEcho = (paragraphs: string[], docId?: string) => {
+  const echoed = paragraphs.map(p => DOC_ECHO.exec(p)?.[1]);
+
+  /** Only an echo of the attachment itself, or of the id it is adopting. */
+  const adopted = docId ?? echoed.find(Boolean);
+  const kept = paragraphs.filter(
+    (p, i) => p.trim() && !(echoed[i] !== undefined && echoed[i] === adopted)
+  );
+
+  return { paragraphs: kept.length ? kept : paragraphs, docId: adopted };
+};
 
 /** A window of body text around the first match, so search results are skimmable. */
 export const excerpt = (body: string, needle: string) => {
@@ -138,52 +176,45 @@ const readTools = (ctx: ToolContext) => ({
   }),
 
   list_documents: tool({
-    description:
-      'List documents. Defaults to this thread; pass scope "all" to see documents ' +
-      'from every thread, which is how you find prior work to build on.',
-    inputSchema: z.object({
-      scope: scopeSchema
-    }),
-    execute: async ({ scope }) => {
-      const all = await listDocuments(scope === 'all' ? undefined : ctx.threadId);
-      return all.map(d => ({
-        id: d.id,
-        name: d.name,
-        author: d.author,
-        threadName: d.threadName
-      }));
+    description: 'List the documents in this thread.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      const all = await listDocuments(ctx.threadId);
+      return all.map(d => ({ id: d.id, name: d.name, author: d.author }));
     }
   }),
 
   read_document: tool({
-    description: 'Read the full body of one document by id.',
+    description: 'Read the full body of one document in this thread, by id.',
     inputSchema: z.object({ id: z.string().describe('The document id from list_documents.') }),
     execute: async ({ id }) => {
       const doc = await getDocument(id);
-      if (!doc) return { error: `No document with id "${id}".` };
+      /**
+       * Same thread check the write path makes. An id is guessable and can be
+       * carried in from anywhere, so the read is filtered here rather than
+       * trusting that the id came from this thread's `list_documents`.
+       */
+      if (!doc || doc.threadId !== ctx.threadId) return { error: `No document with id "${id}".` };
       return { id: doc.id, name: doc.name, body: doc.body };
     }
   }),
 
   search_documents: tool({
     description:
-      'Find documents whose name or body contains some text. Defaults to this thread; ' +
-      'pass scope "all" to search every thread. ' +
+      'Find documents in this thread whose name or body contains some text. ' +
       'Use this before writing a new document, to check whether one already exists.',
     inputSchema: z.object({
-      query: z.string().describe('The text to look for. Case-insensitive.'),
-      scope: scopeSchema
+      query: z.string().describe('The text to look for. Case-insensitive.')
     }),
-    execute: async ({ query, scope }) => {
+    execute: async ({ query }) => {
       const needle = query.trim().toLowerCase();
       if (!needle) return [];
-      const all = await listDocuments(scope === 'all' ? undefined : ctx.threadId);
+      const all = await listDocuments(ctx.threadId);
       const hits = all.filter(d => `${d.name} ${d.body}`.toLowerCase().includes(needle));
       return hits.map(d => ({
         id: d.id,
         name: d.name,
         author: d.author,
-        threadName: d.threadName,
         excerpt: excerpt(d.body, needle)
       }));
     }
@@ -194,12 +225,35 @@ const readTools = (ctx: ToolContext) => ({
 const writeTools = (ctx: ToolContext) => ({
   write_document: tool({
     description:
-      'Write a new markdown document into this thread. Returns the id, which you can attach to a chat message.',
+      'Write a new markdown document into this thread. Search first — if the subject is ' +
+      'already covered, update that document instead of writing a second one. Returns the ' +
+      'id, which you attach to a chat message with docId.',
     inputSchema: z.object({
       name: z.string().describe('A short file name, e.g. "eval-protocol-v1".'),
-      body: z.string().describe('The full markdown body.')
+      body: z
+        .string()
+        .describe(
+          'The full markdown body. Lead with the conclusion. Written for someone who ' +
+            'missed the thread.'
+        )
     }),
     execute: async ({ name, body }) => {
+      /**
+       * A second document under a name the thread already uses is the
+       * duplicate this tool exists to prevent — most often an orchestrator
+       * recording a decision as a fresh copy of the document it decided on.
+       * `uniqueId` would quietly suffix it, leaving the thread with two
+       * documents of the same name and no way to tell which one is current.
+       */
+      const clash = (await listDocuments(ctx.threadId)).find(
+        d => d.name.toLowerCase() === name.trim().toLowerCase()
+      );
+      if (clash)
+        return {
+          error: `"${name}" already exists in this thread (id "${clash.id}"). Revise it with update_document.`,
+          id: clash.id
+        };
+
       const id = await uniqueId(documents, name);
       await db
         .insert(documents)
@@ -262,11 +316,12 @@ const writeTools = (ctx: ToolContext) => ({
     description:
       'Say something to the group. This posts a message into the chat under your own name. ' +
       'Keep it short and conversational, the way a person talks in a group chat. ' +
+      'Attaching a document? Pass its id as docId, not in the text. ' +
       'You may call this more than once in a turn, then call finish when you have nothing left to add.',
     inputSchema: z.object({
       paragraphs: z
         .array(z.string())
-        .describe('One or two short paragraphs. Not an essay. No preamble.'),
+        .describe('What you are saying. Usually one line. Not an essay. No preamble.'),
       docId: z
         .string()
         .optional()
@@ -276,9 +331,8 @@ const writeTools = (ctx: ToolContext) => ({
       await appendMessage({
         threadId: ctx.threadId,
         authorId: ctx.agentId,
-        paragraphs,
         tag: ctx.tag,
-        docId
+        ...withoutDocEcho(paragraphs, docId)
       });
       return { posted: true };
     }
