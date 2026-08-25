@@ -118,7 +118,13 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
 
   try {
     const timings = new Map<string, number>();
-    const ctx: ToolContext = { threadId, agentId, tag: agent.role || 'agent', timings };
+    const ctx: ToolContext = {
+      threadId,
+      agentId,
+      tag: agent.role || 'agent',
+      timings,
+      searched: new Set()
+    };
     const result = await generateText({
       model: chatModel,
       providerOptions: noThinking,
@@ -221,7 +227,13 @@ export const runOrchestrator = async (threadId: string) => {
 
   try {
     const timings = new Map<string, number>();
-    const ctx: ToolContext = { threadId, agentId: orch.id, tag: 'orch', timings };
+    const ctx: ToolContext = {
+      threadId,
+      agentId: orch.id,
+      tag: 'orch',
+      timings,
+      searched: new Set()
+    };
     const result = await generateText({
       model: chatModel,
       providerOptions: noThinking,
