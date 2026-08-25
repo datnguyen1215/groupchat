@@ -29,6 +29,12 @@ const result = await generateText({
   stopWhen: stepCountIs(5)
 });
 
-console.log('toolCalls:', result.steps.flatMap(s => s.toolCalls ?? []).map(c => c.toolName));
-console.log('reasoning parts:', result.steps.flatMap(s => s.content ?? []).filter((p: any) => p.type === 'reasoning').length);
+console.log(
+  'toolCalls:',
+  result.steps.flatMap(s => s.toolCalls ?? []).map(c => c.toolName)
+);
+console.log(
+  'reasoning parts:',
+  result.steps.flatMap(s => s.content ?? []).filter((p: any) => p.type === 'reasoning').length
+);
 console.log('text:', result.text);
