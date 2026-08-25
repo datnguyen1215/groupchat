@@ -49,6 +49,13 @@
 
 - Commit `package-lock.json` in its own separate commit. Never mix it with code changes.
 
+Before merging a branch into `master`, in order:
+
+1. Merge `master` into the branch. Resolve conflicts there, not on `master`.
+2. Write the tests for the feature.
+3. Run the full suite. Everything must pass.
+4. Only then merge the branch into `master`.
+
 ## Ports
 
 - Every service in this project runs on a port in the **10200+** range.
@@ -81,5 +88,5 @@ Multi-agent environment. Never edit the main checkout directly.
 - Put it under `~/tmp/` — e.g. `~/tmp/groupchat-<task>`.
 - Do all work in that worktree.
 - Spawning agents? Tell each one the worktree path. They must work there too.
-- After merging into `main`: remove the worktree (`git worktree remove`) and delete the branch (`git branch -d`).
+- After merging into `master`: remove the worktree (`git worktree remove`) and delete the branch (`git branch -d`).
 - Only touch your own worktree and branch. Never remove or delete anyone else's.
