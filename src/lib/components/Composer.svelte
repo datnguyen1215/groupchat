@@ -51,7 +51,7 @@
   class="flex-none px-6 pt-2 pb-5"
 >
   <div
-    class="relative mx-auto max-w-[620px] rounded-[13px] border border-line bg-panel px-[14px] py-3 focus-within:border-edge"
+    class="relative rounded-[13px] border border-line bg-panel px-[14px] py-3 focus-within:border-edge"
   >
     <!-- Once the text scrolls, this fades its top edge to say there is more above. -->
     <div
