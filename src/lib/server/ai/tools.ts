@@ -15,6 +15,7 @@ import {
   updateDocument
 } from '../repo';
 import { logger, since } from '../logger';
+import { researchTools, search } from '../research';
 import { summarise } from './detail';
 
 const log = logger('tool');
@@ -90,7 +91,21 @@ export type ToolContext = {
    * restarts each step, but the suffix after it does not repeat.
    */
   timings?: Map<string, number>;
+  /**
+   * The queries this turn has already run, lowercased. A fresh `ctx` is built
+   * per turn in `loop.ts`, so the set is turn-scoped without anything having to
+   * clear it.
+   */
+  searched?: Set<string>;
 };
+
+/**
+ * How many distinct searches one turn may run.
+ *
+ * Left alone, a model that cannot find an answer keeps rephrasing the same
+ * question. The cap turns that loop into an instruction to write up what it has.
+ */
+const SEARCH_BUDGET = 6;
 
 /** Escapes a value for embedding in a `RegExp`. Document ids are slugs, but not guaranteed. */
 const escapeRe = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -136,6 +151,42 @@ export const excerpt = (body: string, needle: string) => {
 
 /** Read-side tools. Both the orchestrator and the workers get these. */
 const readTools = (ctx: ToolContext) => ({
+  /**
+   * The description and the HTTP live in `research/`; what is added here is the
+   * turn's budget, which belongs to a turn and is not that module's business.
+   */
+  web_search: tool({
+    description: researchTools.web_search.description,
+    inputSchema: researchTools.web_search.inputSchema,
+    execute: async ({ query }: { query: string }) => {
+      const seen = ctx.searched;
+      const key = query.trim().toLowerCase();
+
+      if (seen?.has(key)) {
+        log.warn({ agentId: ctx.agentId, threadId: ctx.threadId, query }, 'search repeated');
+        return 'You already ran this exact search. Use what it returned rather than running it again.';
+      }
+
+      if (seen && seen.size >= SEARCH_BUDGET) {
+        log.warn(
+          { agentId: ctx.agentId, threadId: ctx.threadId, query, distinct: seen.size },
+          'search budget spent'
+        );
+        return `You have searched ${seen.size} times, which is your limit. Stop searching and work from what you already found.`;
+      }
+
+      seen?.add(key);
+
+      const hits = await search(query);
+
+      if (hits.length === 0) {
+        return 'Nothing came back for that. Say so plainly, or try one differently-worded search — not several.';
+      }
+
+      return hits;
+    }
+  }),
+
   list_skills: tool({
     description: 'List every skill available, with its id and description.',
     inputSchema: z.object({}),
