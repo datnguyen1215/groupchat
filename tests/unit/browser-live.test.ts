@@ -86,6 +86,57 @@ describe.runIf(live)('a real browser', () => {
     expect(seenByB).toContain('iana.org');
   }, 120_000);
 
+  /**
+   * What the page sees, not what the flag says.
+   *
+   * Headless Chromium announces `HeadlessChrome` in its user agent, and a site
+   * that reads it turns the agent away before it sees a page. Asserting on the
+   * spawn arguments would pass whether or not the flag reached the browser, so
+   * the browser is asked directly.
+   */
+  it('does not announce itself as headless', async () => {
+    const tools = browserTools('live-ua') as any;
+
+    await tools.browser_navigate.execute({ url: PAGE }, {});
+    const session = await sessionFor('live-ua');
+    const seen = JSON.stringify(
+      await session.tools.browser_evaluate.execute({ function: '() => navigator.userAgent' }, {})
+    );
+
+    expect(seen).not.toContain('HeadlessChrome');
+    expect(seen).toContain('Chrome/');
+  }, 120_000);
+
+  /**
+   * The flag every detector reads first. Raw Playwright leaves it true; the MCP
+   * server does not, and that is worth holding onto — it is the difference
+   * between a site seeing a browser and a site seeing a robot.
+   */
+  it('does not raise the automation flag', async () => {
+    const tools = browserTools('live-wd') as any;
+
+    await tools.browser_navigate.execute({ url: PAGE }, {});
+    const session = await sessionFor('live-wd');
+    const seen = JSON.stringify(
+      await session.tools.browser_evaluate.execute({ function: '() => navigator.webdriver' }, {})
+    );
+
+    expect(seen).not.toContain('true');
+  }, 120_000);
+
+  /** A desktop viewport, so a responsive site serves the page a person would see. */
+  it('lays pages out at a desktop size', async () => {
+    const tools = browserTools('live-size') as any;
+
+    await tools.browser_navigate.execute({ url: PAGE }, {});
+    const session = await sessionFor('live-size');
+    const seen = JSON.stringify(
+      await session.tools.browser_evaluate.execute({ function: '() => window.innerWidth' }, {})
+    );
+
+    expect(seen).toContain('1920');
+  }, 120_000);
+
   it('reuses one context for a thread across separate tool calls', async () => {
     const first = await sessionFor('live-sticky');
     const second = await sessionFor('live-sticky');
