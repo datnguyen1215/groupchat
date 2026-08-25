@@ -41,6 +41,7 @@
 - Applies to test runs, builds, dev servers, migrations — anything noisy.
 - Name the file after the task: `~/tmp/groupchat-<task>.log`.
 - Read the log to inspect results. Tell the user the path when it matters.
+- Screenshots go under `~/tmp/` too — never into the repo. Playwright's `outputDir` already points there.
 
 ## Live updates
 
