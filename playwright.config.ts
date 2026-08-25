@@ -25,7 +25,7 @@ export default defineConfig({
    * Traces and error context, like the cookie, cannot share a path across runs.
    * They live outside the repo so a run never leaves artifacts in the checkout.
    */
-  outputDir: path.join(os.homedir(), 'tmp', 'groupchat-test-results', SCHEMA),
+  outputDir: path.join(os.homedir(), 'tmp', 'groupchat', 'test-results', SCHEMA),
   globalSetup: './tests/support/global-setup.ts',
   globalTeardown: './tests/support/global-teardown.ts',
   fullyParallel: true,

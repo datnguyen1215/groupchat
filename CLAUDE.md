@@ -37,11 +37,13 @@
 
 ## Command output
 
-- Redirect long-running commands to a log file: `npm test > ~/tmp/test.log 2>&1`.
+All scratch output lives under `~/tmp/groupchat/`. Never in the repo.
+
+- Redirect long-running commands to a log file: `npm test > ~/tmp/groupchat/test.log 2>&1`.
 - Applies to test runs, builds, dev servers, migrations — anything noisy.
-- Name the file after the task: `~/tmp/groupchat-<task>.log`.
+- Name the file after the task: `~/tmp/groupchat/<task>.log`.
 - Read the log to inspect results. Tell the user the path when it matters.
-- Screenshots go under `~/tmp/` too — never into the repo. Playwright's `outputDir` already points there.
+- Screenshots go there too. Playwright's `outputDir` already points at `~/tmp/groupchat/test-results/`.
 
 ## Live updates
 
