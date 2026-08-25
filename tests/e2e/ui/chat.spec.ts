@@ -51,16 +51,36 @@ const seedEntries = async (rows: { author: string; text: string }[]) => {
 const stream = (page: import('@playwright/test').Page) => page.locator('article').locator('..');
 
 /** Busy is always busy *in a thread*; that is what scopes the presence row. */
-const setStatus = async (agentId: string, status: string, label: string) => {
+const setStatus = async (agentId: string, status: string, label: string, title?: string) => {
   const sql = connect();
   try {
     await sql`
       update agents
       set status = ${status},
           status_label = ${label},
+          status_title = ${title ?? null},
           busy_thread_id = ${status === 'busy' ? THREAD : null}
       where id = ${agentId}
     `;
+  } finally {
+    await sql.end();
+  }
+};
+
+/**
+ * The steps the presence row lists under the title. `group_label` is the agent
+ * name, which is how a step finds the row it belongs to.
+ */
+const seedSteps = async (groupLabel: string, names: string[]) => {
+  const sql = connect();
+  try {
+    await sql`delete from steps where thread_id = ${THREAD}`;
+    for (const [i, name] of names.entries())
+      await sql`
+        insert into steps (id, thread_id, group_label, seq, state, name, detail, duration_ms)
+        values (${`${THREAD}-s${i + 1}`}, ${THREAD}, ${groupLabel}, ${i + 1}, 'ok',
+                ${name}, '', ${(i + 1) * 1000})
+      `;
   } finally {
     await sql.end();
   }
@@ -123,7 +143,10 @@ test.describe('presence', () => {
     }
   });
 
-  test.afterEach(async () => await setStatus(AGENT, 'idle', 'Idle'));
+  test.afterEach(async () => {
+    await setStatus(AGENT, 'idle', 'Idle');
+    await seedSteps('Probe', []);
+  });
 
   test('shows a working row for a busy agent', async ({ page }) => {
     await seedEntries([{ author: 'you', text: 'go' }]);
@@ -167,6 +190,77 @@ test.describe('presence', () => {
 
     await expect(page.getByText('Probe', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Working')).toBeVisible();
+  });
+
+  /**
+   * The point of the whole feature: the row says what the agent is doing, in
+   * the agent's own words, not which tool it happened to call.
+   */
+  test('shows the agent’s own words for what it is working on', async ({ page }) => {
+    await seedEntries([{ author: 'you', text: 'go' }]);
+    await seedSteps('Probe', []);
+    await setStatus(AGENT, 'busy', 'Working', 'Comparing payment terms');
+
+    await ready(page, `/chats/${THREAD}`);
+
+    await expect(page.getByText('Comparing payment terms')).toBeVisible();
+  });
+
+  test('lists the steps it already finished under the title', async ({ page }) => {
+    await seedEntries([{ author: 'you', text: 'go' }]);
+    await seedSteps('Probe', ['read_document', 'web_search']);
+    await setStatus(AGENT, 'busy', 'Working', 'Comparing payment terms');
+
+    await ready(page, `/chats/${THREAD}`);
+
+    const done = page.getByLabel('Finished steps');
+    await expect(done.getByText('read_document')).toBeVisible();
+    await expect(done.getByText('web_search')).toBeVisible();
+  });
+
+  /**
+   * The row sits above the composer. Uncapped, a long turn pushes it off screen,
+   * so the query keeps only the most recent few.
+   */
+  test('keeps only the last three steps', async ({ page }) => {
+    await seedEntries([{ author: 'you', text: 'go' }]);
+    await seedSteps('Probe', ['first_call', 'second_call', 'third_call', 'fourth_call']);
+    await setStatus(AGENT, 'busy', 'Working', 'Still going');
+
+    await ready(page, `/chats/${THREAD}`);
+
+    const done = page.getByLabel('Finished steps');
+    await expect(done.getByText('fourth_call')).toBeVisible();
+    await expect(done.getByText('first_call')).toHaveCount(0);
+  });
+
+  /**
+   * The stretch before an agent's first `set_status` call has no title. The row
+   * falls back to the last thing it did rather than going blank.
+   */
+  test('falls back to the last step before the first status arrives', async ({ page }) => {
+    await seedEntries([{ author: 'you', text: 'go' }]);
+    await seedSteps('Probe', ['web_search']);
+    await setStatus(AGENT, 'busy', 'Working');
+
+    await ready(page, `/chats/${THREAD}`);
+
+    await expect(page.getByLabel('Presence: Probe').getByText('web_search')).toBeVisible();
+  });
+
+  /**
+   * Steps are scoped to the agent that ran them. A thread-wide "last step"
+   * captions every busy row with whichever agent happened to write last.
+   */
+  test('does not caption a row with another agent’s steps', async ({ page }) => {
+    await seedEntries([{ author: 'you', text: 'go' }]);
+    await seedSteps('Someone Else', ['not_my_call']);
+    await setStatus(AGENT, 'busy', 'Working', 'Comparing payment terms');
+
+    await ready(page, `/chats/${THREAD}`);
+
+    await expect(page.getByText('Comparing payment terms')).toBeVisible();
+    await expect(page.getByLabel('Finished steps')).toHaveCount(0);
   });
 });
 

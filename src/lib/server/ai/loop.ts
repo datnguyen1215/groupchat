@@ -5,41 +5,13 @@ import { eq } from 'drizzle-orm';
 import { MAX_STEPS, chatModel, noThinking } from './model';
 import { orchestratorPrompt, workerPrompt } from './prompts';
 import { orchestratorTools, workerTools, type ToolContext } from './tools';
-import { BLOCKED, appendError, appendStep, listEntries, setAgentStatus } from '../repo';
+import { BLOCKED, appendError, listEntries, setAgentStatus } from '../repo';
 import { logger, since } from '../logger';
-import { SILENT, summarise } from './detail';
+import { SILENT } from './detail';
 
 const log = logger('agent');
 
 export { SILENT };
-
-/**
- * How one tool call reads in the feed: its state, and the name shown against
- * it. Working calls keep their tool name in mono; the three an agent is
- * *judged* by — talking, writing, revising — get a sentence instead, because
- * "Wren commented" is what the reader is scanning for, not `send_chat_message`.
- */
-const FEED = {
-  send_chat_message: { state: 'say', verb: 'commented' },
-  write_document: { state: 'doc', verb: 'wrote document' },
-  update_document: { state: 'doc', verb: 'updated document' },
-  run_agent: { state: 'spawn', verb: null }
-} as const;
-
-export type FeedState = 'ok' | 'run' | 'spawn' | 'say' | 'doc';
-
-/** The state one tool call carries in the feed. */
-export const stateFor = (toolName: string): FeedState =>
-  FEED[toolName as keyof typeof FEED]?.state ?? 'ok';
-
-/**
- * The name shown against one call. A sentence for the three that read as the
- * agent acting in the thread, the raw tool name for the rest.
- */
-export const nameFor = (agentName: string, toolName: string) => {
-  const verb = FEED[toolName as keyof typeof FEED]?.verb;
-  return verb ? `${agentName} ${verb}` : toolName;
-};
 
 /**
  * The transcript the model sees. Activity strips are skipped — they summarise
@@ -51,49 +23,6 @@ const transcript = async (threadId: string) => {
     .filter(e => e.kind === 'message')
     .map(e => `${e.author}: ${e.paragraphs.join('\n')}`)
     .join('\n\n');
-};
-
-/**
- * Writes one agent's turn into `steps` — the whole turn, not just the tools.
- * A comment, a document write and a search all land here in the order they
- * happened, because the feed is the one place that answers "what went on in
- * this thread".
- *
- * The chat stream still carries the comment itself; this row is the same event
- * seen from the activity side, which is why it holds only a summary of it.
- */
-export const recordSteps = async (
-  threadId: string,
-  label: string,
-  steps: { toolCalls?: { toolName: string; toolCallId?: string; input: unknown }[] }[],
-  timings: Map<string, number> = new Map()
-) => {
-  const calls = steps
-    .flatMap(step => step.toolCalls ?? [])
-    .filter(call => !SILENT.has(call.toolName));
-
-  for (const call of calls) {
-    const state = stateFor(call.toolName);
-    await appendStep({
-      threadId,
-      groupLabel: label,
-      state,
-      name: nameFor(label, call.toolName),
-      detail: summarise(call.input),
-      /**
-       * Looked up by id, not by position: the calls in one step run
-       * concurrently and finish in an order this list does not predict.
-       *
-       * A call with no timing stays null, which the feed renders as `running`.
-       * That is right for a call still in flight, and it is also where a known
-       * gap lands: `result.steps` occasionally reports a call that never
-       * reached the wrapper, so a small number of rows show `running` after
-       * the turn is over. Better a missing duration than a borrowed one.
-       */
-      durationMs: (call.toolCallId ? timings.get(call.toolCallId) : undefined) ?? null,
-      badge: state === 'spawn' ? 'agent' : undefined
-    });
-  }
 };
 
 const agentRow = async (id: string) => {
@@ -117,12 +46,11 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
   log.info({ agentId, agentName: agent.name, threadId, task }, 'worker start');
 
   try {
-    const timings = new Map<string, number>();
     const ctx: ToolContext = {
       threadId,
       agentId,
+      agentName: agent.name,
       tag: agent.role || 'agent',
-      timings,
       searched: new Set()
     };
     const result = await generateText({
@@ -134,7 +62,6 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
       stopWhen: stepCountIs(MAX_STEPS)
     });
 
-    await recordSteps(threadId, agent.name, result.steps, timings);
     log.info(
       {
         agentId,
@@ -226,12 +153,11 @@ export const runOrchestrator = async (threadId: string) => {
   log.info({ agentId: orch.id, agentName: orch.name, threadId }, 'turn start');
 
   try {
-    const timings = new Map<string, number>();
     const ctx: ToolContext = {
       threadId,
       agentId: orch.id,
+      agentName: orch.name,
       tag: 'orch',
-      timings,
       searched: new Set()
     };
     const result = await generateText({
@@ -245,7 +171,6 @@ export const runOrchestrator = async (threadId: string) => {
       stopWhen: stepCountIs(MAX_STEPS)
     });
 
-    await recordSteps(threadId, orch.name, result.steps, timings);
     log.info(
       {
         agentId: orch.id,

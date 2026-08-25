@@ -43,6 +43,13 @@
       "when": 1787657139838,
       "tag": "0005_melted_prodigy",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787669870344,
+      "tag": "0006_true_moondragon",
+      "breakpoints": true
     }
   ]
 }

@@ -28,7 +28,8 @@
     color: string;
     tag: string;
     statusLabel: string;
-    lastStep: { name: string; detail: string } | null;
+    statusTitle: string | null;
+    steps: { id: string; name: string; detail: string; durationMs: number | null }[];
   };
 
   type Props = { entries: Entry[]; busy: Busy[] };
@@ -134,7 +135,8 @@
         color={agent.color}
         tag={agent.tag}
         statusLabel={agent.statusLabel}
-        lastStep={agent.lastStep}
+        statusTitle={agent.statusTitle}
+        steps={agent.steps}
       />
     {/each}
 
