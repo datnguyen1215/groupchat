@@ -63,6 +63,10 @@
 | 10204 | UI mockup server (`ui-variations` skill) |
 | 10302 | Test server (Playwright)                 |
 
+- Multiple agents run at once. Another agent may already hold the port.
+- Check the port is free before starting a test server: `ss -ltn | grep :10302`.
+- Taken? Use the next free port in the 10200+ range for that run. Do not kill the process holding it.
+
 ## Reports
 
 - Report what changed and that it passed. Nothing else.
