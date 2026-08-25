@@ -259,8 +259,7 @@ export const describe = (error: unknown) => {
 };
 
 /** A fragment from `describe` as a standalone line. */
-export const sentence = (fragment: string) =>
-  fragment.charAt(0).toUpperCase() + fragment.slice(1);
+export const sentence = (fragment: string) => fragment.charAt(0).toUpperCase() + fragment.slice(1);
 
 const statusOf = (error: unknown) => {
   if (!error || typeof error !== 'object') return null;
