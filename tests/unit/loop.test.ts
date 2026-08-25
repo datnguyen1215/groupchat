@@ -286,37 +286,99 @@ describe('delegating', () => {
 describe('recordSteps durations', () => {
   const appendStep = vi.mocked(repoMock.appendStep);
 
-  const turn = [{ toolCalls: [call('search_documents'), call('write_document')] }];
+  const idCall = (toolName: string, toolCallId: string) => ({ toolName, toolCallId, input: {} });
 
   beforeEach(() => appendStep.mockClear());
 
   const durations = () => appendStep.mock.calls.map(([arg]) => arg.durationMs);
 
-  it('gives each working call the duration traced recorded', async () => {
-    await recordSteps('t1', 'Wren', turn, [12, 3400]);
+  it('gives each call the duration traced recorded against its id', async () => {
+    const turn = [{ toolCalls: [idCall('search_documents', 'a'), idCall('write_document', 'b')] }];
+    await recordSteps(
+      't1',
+      'Wren',
+      turn,
+      new Map([
+        ['a', 12],
+        ['b', 3400]
+      ])
+    );
     expect(durations()).toEqual([12, 3400]);
   });
 
   it('leaves a call without a timing null rather than borrowing one', async () => {
-    await recordSteps('t1', 'Wren', turn, [12]);
+    const turn = [{ toolCalls: [idCall('search_documents', 'a'), idCall('write_document', 'b')] }];
+    await recordSteps('t1', 'Wren', turn, new Map([['a', 12]]));
     expect(durations()).toEqual([12, null]);
   });
 
   it('records nothing rather than guessing when no timings arrived', async () => {
-    await recordSteps('t1', 'Wren', turn);
-    expect(durations()).toEqual([null, null]);
+    await recordSteps('t1', 'Wren', [{ toolCalls: [idCall('search_documents', 'a')] }]);
+    expect(durations()).toEqual([null]);
   });
 
-  it('keeps timings aligned across the calls the feed keeps', async () => {
-    /**
-     * A comment is a feed row, so it takes a timing like any other call.
-     * `finish` is the only one dropped, and `traced` skips exactly the same
-     * one — otherwise every row after it would show its neighbour's duration.
-     */
-    const mixed = [
-      { toolCalls: [call('search_documents'), call('send_chat_message'), call('finish')] }
+  /**
+   * The calls in one step run concurrently and finish in an order the step
+   * list does not predict, so a duration has to find its own row by id.
+   */
+  it('holds each duration to its own row when calls finish out of order', async () => {
+    const turn = [
+      {
+        toolCalls: [
+          idCall('send_chat_message', 'first'),
+          idCall('send_chat_message', 'second'),
+          idCall('send_chat_message', 'third')
+        ]
+      }
     ];
-    await recordSteps('t1', 'Wren', mixed, [12, 3400]);
+    const timings = new Map([
+      ['third', 9],
+      ['first', 1],
+      ['second', 5]
+    ]);
+    await recordSteps('t1', 'Finch', turn, timings);
+    expect(durations()).toEqual([1, 5, 9]);
+  });
+
+  /**
+   * A turn is many steps, and the ids stay unique across all of them — the
+   * `call_NN` prefix restarts each step but the suffix does not repeat. Rows
+   * from later steps have to keep their own durations.
+   */
+  it('keeps durations with their rows across steps', async () => {
+    const turn = [
+      { toolCalls: [idCall('read_skill', 'call_00_aaa')] },
+      { toolCalls: [idCall('send_chat_message', 'call_00_bbb')] },
+      { toolCalls: [idCall('send_chat_message', 'call_00_ccc')] }
+    ];
+    const timings = new Map([
+      ['call_00_aaa', 13],
+      ['call_00_bbb', 7],
+      ['call_00_ccc', 4]
+    ]);
+    await recordSteps('t1', 'Wren', turn, timings);
+    expect(durations()).toEqual([13, 7, 4]);
+  });
+
+  it('skips finish but still times everything the feed keeps', async () => {
+    const turn = [
+      {
+        toolCalls: [
+          idCall('search_documents', 'a'),
+          idCall('send_chat_message', 'b'),
+          idCall('finish', 'c')
+        ]
+      }
+    ];
+    await recordSteps(
+      't1',
+      'Wren',
+      turn,
+      new Map([
+        ['a', 12],
+        ['b', 3400]
+      ])
+    );
     expect(durations()).toEqual([12, 3400]);
     expect(appendStep.mock.calls.map(([arg]) => arg.name)).toEqual([
       'search_documents',

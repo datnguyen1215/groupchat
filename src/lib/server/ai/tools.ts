@@ -15,7 +15,7 @@ import {
   updateDocument
 } from '../repo';
 import { logger, since } from '../logger';
-import { SILENT, summarise } from './detail';
+import { summarise } from './detail';
 
 const log = logger('tool');
 
@@ -32,7 +32,7 @@ const log = logger('tool');
 const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T => {
   const wrapped = Object.entries(tools).map(([name, definition]) => {
     const run = definition.execute;
-    const execute = async (input: unknown, options: unknown) => {
+    const execute = async (input: unknown, options: { toolCallId?: string }) => {
       const start = Date.now();
       const base = { tool: name, agentId: ctx.agentId, threadId: ctx.threadId };
 
@@ -41,7 +41,7 @@ const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T =>
 
       /** Both paths record: a call that threw still took the time it took. */
       const record = () => {
-        if (ctx.timings && !SILENT.has(name)) ctx.timings.push(since(start));
+        if (ctx.timings && options?.toolCallId) ctx.timings.set(options.toolCallId, since(start));
       };
 
       try {
@@ -80,12 +80,16 @@ export type ToolContext = {
   agentId: string;
   tag: string;
   /**
-   * Where `traced` records how long each call took, in call order. The step
-   * rows are written after the turn ends, by which point the durations are
-   * gone — the SDK's `steps` carry the calls but not their timings. Speech is
-   * excluded here for the same reason it is excluded from the rows.
+   * Where `traced` records how long each call took. The step rows are written
+   * after the turn ends, by which point the durations are gone —
+   * `result.steps` carries the calls but not their timings.
+   *
+   * Keyed by `toolCallId` rather than by position, because the calls in one
+   * step run concurrently and finish in an order `result.steps` does not
+   * predict. The id is unique for the whole turn — the `call_NN` prefix
+   * restarts each step, but the suffix after it does not repeat.
    */
-  timings?: number[];
+  timings?: Map<string, number>;
 };
 
 /** Escapes a value for embedding in a `RegExp`. Document ids are slugs, but not guaranteed. */

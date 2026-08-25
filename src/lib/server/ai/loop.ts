@@ -65,14 +65,14 @@ const transcript = async (threadId: string) => {
 export const recordSteps = async (
   threadId: string,
   label: string,
-  steps: { toolCalls?: { toolName: string; input: unknown }[] }[],
-  timings: number[] = []
+  steps: { toolCalls?: { toolName: string; toolCallId?: string; input: unknown }[] }[],
+  timings: Map<string, number> = new Map()
 ) => {
   const calls = steps
     .flatMap(step => step.toolCalls ?? [])
     .filter(call => !SILENT.has(call.toolName));
 
-  for (const [i, call] of calls.entries()) {
+  for (const call of calls) {
     const state = stateFor(call.toolName);
     await appendStep({
       threadId,
@@ -81,12 +81,16 @@ export const recordSteps = async (
       name: nameFor(label, call.toolName),
       detail: summarise(call.input),
       /**
-       * `traced` records one timing per call it wraps, in the order they ran,
-       * so the indexes line up with `calls`. A call that never reached the
-       * wrapper has none, and the row stays `running` rather than claiming a
-       * duration it never had.
+       * Looked up by id, not by position: the calls in one step run
+       * concurrently and finish in an order this list does not predict.
+       *
+       * A call with no timing stays null, which the feed renders as `running`.
+       * That is right for a call still in flight, and it is also where a known
+       * gap lands: `result.steps` occasionally reports a call that never
+       * reached the wrapper, so a small number of rows show `running` after
+       * the turn is over. Better a missing duration than a borrowed one.
        */
-      durationMs: timings[i] ?? null,
+      durationMs: (call.toolCallId ? timings.get(call.toolCallId) : undefined) ?? null,
       badge: state === 'spawn' ? 'agent' : undefined
     });
   }
@@ -113,7 +117,7 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
   log.info({ agentId, agentName: agent.name, threadId, task }, 'worker start');
 
   try {
-    const timings: number[] = [];
+    const timings = new Map<string, number>();
     const ctx: ToolContext = { threadId, agentId, tag: agent.role || 'agent', timings };
     const result = await generateText({
       model: chatModel,
@@ -216,7 +220,7 @@ export const runOrchestrator = async (threadId: string) => {
   log.info({ agentId: orch.id, agentName: orch.name, threadId }, 'turn start');
 
   try {
-    const timings: number[] = [];
+    const timings = new Map<string, number>();
     const ctx: ToolContext = { threadId, agentId: orch.id, tag: 'orch', timings };
     const result = await generateText({
       model: chatModel,
