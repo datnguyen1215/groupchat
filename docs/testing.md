@@ -18,8 +18,14 @@ npm run test:ui    # playwright — Chromium at 1440×900
 
 ## Schema isolation
 
-**Tests never touch development data.** They run against a dedicated `test`
-Postgres schema in the same container; only the `search_path` differs.
+**Tests never touch development data.** They run against a dedicated Postgres
+schema in the same container; only the `search_path` differs.
+
+That schema is named per run — `test_<pid>`, generated in `playwright.config.ts`
+and exported so both the dev server and `tests/support/*` agree on it. Several
+agents work this repo at once, and global setup drops whatever schema it is
+handed: on a shared name, one run would wipe another's data mid-flight.
+`tests/support/global-teardown.ts` drops the run's schema at the end.
 
 `tests/support/global-setup.ts` drops and rebuilds that schema from
 `drizzle/*.sql` before every run, then seeds a small fixed baseline. Dev data
@@ -31,7 +37,19 @@ One wrinkle worth knowing: Drizzle hardcodes `"public"."enum_name"` on its
 rewrites that qualifier so the enums land beside their tables. If a future
 migration fails only under test, check that rewrite first.
 
-Point the tests at another schema with `DATABASE_SCHEMA=scratch npm run test:e2e`.
+Pin the schema with `DATABASE_SCHEMA=scratch npm run test:e2e` — set, it wins
+over the generated name, and teardown drops it like any other.
+
+## Host isolation
+
+The suite is served from `127.0.0.1`, not `localhost`. Cookies key on host and
+ignore the port, so a suite on `localhost:10302` writes its session token into
+the same jar as the dev server on `localhost:10200` — signing the developer out,
+because that token names a schema their server cannot see. The two hosts are
+separate origins with separate jars. Override with `TEST_HOST` if needed.
+
+Assert against `testInfo.project.use.baseURL` rather than a literal host; a
+hardcoded `localhost` in a test will not survive this.
 
 ## Parallelism
 
