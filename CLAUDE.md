@@ -88,6 +88,14 @@ Before merging a branch into `master`, in order:
 - Check the port is free before starting a test server: `ss -ltn | grep :10302`.
 - Taken? Use the next free port in the 10200+ range for that run. Do not kill the process holding it.
 
+## Test isolation
+
+- The e2e suite generates its own Postgres schema per run (`test_<pid>`).
+  Do not pin `DATABASE_SCHEMA` — a shared name lets one agent's run wipe another's.
+- Tests are served from `127.0.0.1`, not `localhost`. Cookies ignore the port,
+  so `localhost` shares a jar with the dev server on :10200 and signs you out.
+- Never hardcode a host in a test. Assert against `testInfo.project.use.baseURL`.
+
 ## Reports
 
 - Report what changed and that it passed. Nothing else.
