@@ -69,4 +69,35 @@ describe('groupSteps', () => {
 
     expect(groups[0].steps[0].child).toBe(true);
   });
+
+  /**
+   * The feed carries comments and document writes alongside tool calls. Those
+   * happen instantly, so a null duration means "not applicable" — showing
+   * `running` against a comment claims the agent is still talking.
+   */
+  it('leaves a comment and a document write with no duration', () => {
+    const groups = groupSteps([
+      row(1, 'Wren', { state: 'say', name: 'Wren commented', durationMs: null }),
+      row(2, 'Wren', { state: 'doc', name: 'Wren wrote document', durationMs: null })
+    ]);
+
+    expect(groups[0].steps.map(s => s.duration)).toEqual(['', '']);
+  });
+
+  it('still shows a tool call with no duration as running', () => {
+    const groups = groupSteps([row(1, 'Wren', { state: 'ok', durationMs: null })]);
+
+    expect(groups[0].steps[0].duration).toBe('running');
+  });
+
+  it('groups a comment with the tool calls around it, on one clock', () => {
+    const groups = groupSteps([
+      row(1, 'Wren', { state: 'ok', name: 'web_search' }),
+      row(2, 'Wren', { state: 'say', name: 'Wren commented', durationMs: null }),
+      row(3, 'Wren', { state: 'doc', name: 'Wren wrote document', durationMs: null })
+    ]);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].steps.map(s => s.state)).toEqual(['ok', 'say', 'doc']);
+  });
 });

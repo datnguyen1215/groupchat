@@ -15,7 +15,7 @@ import {
   updateDocument
 } from '../repo';
 import { logger, since } from '../logger';
-import { detailOf } from './detail';
+import { summarise } from './detail';
 
 const log = logger('tool');
 
@@ -29,27 +29,6 @@ const log = logger('tool');
  * the default stream — and summarised at `info` by `summarise`.
  */
 
-/**
- * The `info` summary of a tool's input.
- *
- * `detailOf` alone is not enough here: it only reads string values, and the
- * most interesting call — `send_chat_message` — carries `{ paragraphs: [...] }`,
- * so it would log a blank detail on the one line worth reading. Arrays of
- * strings are joined first; the drawer never sees these tools, so this stays
- * out of `detailOf` rather than changing what the drawer renders.
- */
-const summarise = (input: unknown) => {
-  const direct = detailOf(input);
-  if (direct || !input || typeof input !== 'object') return direct;
-
-  const joined = Object.values(input as Record<string, unknown>)
-    .filter((v): v is string[] => Array.isArray(v) && v.every(x => typeof x === 'string'))
-    .map(v => v.join(' '))
-    .find(Boolean);
-
-  if (!joined) return '';
-  return joined.length > 80 ? `${joined.slice(0, 77)}...` : joined;
-};
 const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T => {
   const wrapped = Object.entries(tools).map(([name, definition]) => {
     const run = definition.execute;

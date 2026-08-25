@@ -4,8 +4,21 @@
   type Props = { groups: StepGroup[]; count: number; open: boolean; onclose: () => void };
   const { groups, count, open, onclose }: Props = $props();
 
-  const dot = { ok: 'bg-ok', run: 'bg-run', spawn: 'bg-accent' };
-  const glyph = { ok: '✓', run: '•', spawn: '↳' };
+  const dot = {
+    ok: 'bg-ok',
+    run: 'bg-run',
+    spawn: 'bg-accent',
+    say: 'bg-ink-3',
+    doc: 'bg-violet'
+  };
+  const glyph = { ok: '✓', run: '•', spawn: '↳', say: '”', doc: '▤' };
+
+  /**
+   * Comments and document writes carry a sentence — "Wren commented" — so they
+   * read as prose. Tool calls keep the mono tool name, which is what makes the
+   * two skimmable apart without a filter.
+   */
+  const prose = (state: string) => state === 'say' || state === 'doc';
 </script>
 
 <section
@@ -17,7 +30,7 @@
   <header class="flex h-10 items-center gap-[9px] border-b border-line-2 px-5">
     <b class="text-[12px] font-semibold">Activity</b>
     <span class="rounded-full bg-line-2 px-[7px] py-[1.5px] font-mono text-[10.5px] text-ink-3">
-      {count} steps
+      {count} events
     </span>
     <button
       class="ml-auto h-6 w-6 rounded-md text-[17px] leading-none text-ink-3 hover:bg-panel-2 hover:text-ink"
@@ -57,7 +70,14 @@
           <div
             class="flex items-center gap-[10px] rounded-[7px] px-[9px] py-[9px] hover:bg-panel-2"
           >
-            <span class="font-mono text-[11.5px] tracking-[-0.02em]">{step.name}</span>
+            <span
+              class:font-mono={!prose(step.state)}
+              class:tracking-[-0.02em]={!prose(step.state)}
+              class:font-semibold={prose(step.state)}
+              class="text-[11.5px] whitespace-nowrap"
+            >
+              {step.name}
+            </span>
             {#if step.badge}
               <span
                 class="rounded bg-accent/[0.13] px-[5px] py-px text-[9px] font-bold tracking-[0.04em] text-accent uppercase"

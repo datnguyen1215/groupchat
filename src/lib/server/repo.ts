@@ -364,19 +364,27 @@ export const getThread = async (id: string) => {
   return row ?? null;
 };
 
-/** The message stream, oldest first. `seq` is the only ordering key. */
+/**
+ * The message stream, oldest first. `seq` is the only ordering key.
+ *
+ * Retired `activity` rows are left out. They were the collapsed strip the
+ * stream used to carry; the feed shows those tool calls in full now, and a
+ * strip row has no author and no paragraphs, so rendering one would put a
+ * blank message in the thread.
+ */
 export const listEntries = async (threadId: string) => {
   const rows = await db
     .select()
     .from(entries)
-    .where(eq(entries.threadId, threadId))
+    .where(and(eq(entries.threadId, threadId), ne(entries.kind, 'activity')))
     .orderBy(asc(entries.seq));
   const authors = await authorIndex(rows.map(r => r.authorId).filter((id): id is string => !!id));
 
   return rows.map(r => {
     const author = r.authorId ? authors.get(r.authorId) : null;
     return {
-      kind: r.kind,
+      /** Narrowed, not cast blind: the query filters `activity` out above. */
+      kind: r.kind as 'message' | 'error',
       id: r.id,
       author: author?.name ?? 'Unknown',
       authorId: r.authorId,
@@ -388,8 +396,7 @@ export const listEntries = async (threadId: string) => {
       time: relativeTime(r.createdAt),
       paragraphs: r.paragraphs,
       docId: r.docId ?? undefined,
-      label: r.label ?? '',
-      bars: r.bars
+      label: r.label ?? ''
     };
   });
 };
@@ -468,31 +475,7 @@ export const appendError = async (input: { threadId: string; line: string }) => 
   return id;
 };
 
-/** The collapsed sparkline that summarises one agent's tool run. */
-export const appendActivity = async (input: {
-  threadId: string;
-  label: string;
-  bars: ('ok' | 'run' | 'spawn')[];
-}) => {
-  const seq = await nextSeq(input.threadId);
-  const id = randomUUID();
-  await db.insert(entries).values({
-    id,
-    threadId: input.threadId,
-    kind: 'activity',
-    seq,
-    label: input.label,
-    bars: input.bars
-  });
-  log.info(
-    { id, threadId: input.threadId, label: input.label, bars: input.bars.length },
-    'activity appended'
-  );
-  publish({ scope: 'thread', threadId: input.threadId });
-  return id;
-};
-
-/** The activity drawer's trace, grouped exactly as it is stored. */
+/** The activity feed, grouped exactly as it is stored. */
 export const listSteps = async (threadId: string) => {
   const rows = await db
     .select()
@@ -507,7 +490,7 @@ export const listSteps = async (threadId: string) => {
 export const appendStep = async (input: {
   threadId: string;
   groupLabel: string;
-  state: 'ok' | 'run' | 'spawn';
+  state: 'ok' | 'run' | 'spawn' | 'say' | 'doc';
   name: string;
   detail: string;
   durationMs: number | null;
