@@ -16,6 +16,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:seed": "node --env-file-if-exists=.env node_modules/.bin/vite-node scripts/seed.ts",
+    "browser:login": "node --env-file-if-exists=.env node_modules/.bin/vite-node scripts/browser-login.ts",
+    "browser:live": "BROWSER_LIVE=1 vitest run tests/unit/browser-live.test.ts",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
@@ -48,6 +50,9 @@
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.31",
+    "@ai-sdk/mcp": "^2.0.37",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@playwright/mcp": "^0.0.79",
     "ai": "^7.0.77",
     "better-auth": "^1.7.1",
     "drizzle-orm": "^0.45.2",

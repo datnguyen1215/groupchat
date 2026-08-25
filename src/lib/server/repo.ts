@@ -5,6 +5,7 @@ import { agentSkills, agents, documents, entries, skills, steps, threads } from 
 import { agentDto, documentDto, skillDto, type Stat } from './serialize';
 import { relativeTime, slugify } from './api';
 import { publish } from './events/bus';
+import { closeSession } from './browser';
 import { logger } from './logger';
 import { groupSteps } from './steps';
 
@@ -353,6 +354,8 @@ export const renameThread = async (id: string, name: string) => {
 /** Cascades take care of the thread's documents, entries and steps. */
 export const deleteThread = async (id: string) => {
   await db.delete(threads).where(eq(threads.id, id));
+  /** Its browser outlives the thread otherwise — nothing else would ever close it. */
+  await closeSession(id, 'thread deleted');
   log.info({ id }, 'thread deleted');
   publish({ scope: 'threads' });
   /** Anyone still viewing it needs to find out the thread is gone. */

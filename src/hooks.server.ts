@@ -4,6 +4,7 @@ import { building } from '$app/environment';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { auth } from '$lib/server/auth';
 import { logger, since } from '$lib/server/logger';
+import { closeAllSessions, stopBrowserServer } from '$lib/server/browser';
 
 const log = logger('http');
 
@@ -70,3 +71,23 @@ export const handleError: HandleServerError = ({ error, event }) => {
   );
   return { message: 'Internal error' };
 };
+
+/**
+ * Shuts the browser down with the app.
+ *
+ * Chromium does not go away when its parent does, so without this a killed dev
+ * server leaves a browser and an MCP process behind — and the next start finds
+ * the port taken and the profile locked.
+ *
+ * Both signals, and `once` so a second Ctrl-C does not run it twice.
+ */
+const shutdown = async () => {
+  await closeAllSessions().catch(() => {});
+  await stopBrowserServer().catch(() => {});
+};
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.once(signal, () => {
+    shutdown().finally(() => process.exit(0));
+  });
+}

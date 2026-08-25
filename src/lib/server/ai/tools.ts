@@ -16,6 +16,7 @@ import {
 } from '../repo';
 import { logger, since } from '../logger';
 import { researchTools, search } from '../research';
+import { browserTools } from '../browser';
 import { summarise } from './detail';
 
 const log = logger('tool');
@@ -186,6 +187,8 @@ const readTools = (ctx: ToolContext) => ({
       return hits;
     }
   }),
+
+  ...browserTools(ctx.threadId),
 
   list_skills: tool({
     description: 'List every skill available, with its id and description.',
