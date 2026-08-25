@@ -5,29 +5,41 @@ import { eq } from 'drizzle-orm';
 import { MAX_STEPS, chatModel, noThinking } from './model';
 import { orchestratorPrompt, workerPrompt } from './prompts';
 import { orchestratorTools, workerTools, type ToolContext } from './tools';
-import {
-  BLOCKED,
-  appendActivity,
-  appendError,
-  appendStep,
-  listEntries,
-  setAgentStatus
-} from '../repo';
+import { BLOCKED, appendError, appendStep, listEntries, setAgentStatus } from '../repo';
 import { logger, since } from '../logger';
-import { SPEECH, detailOf } from './detail';
-
-export { SPEECH };
+import { SILENT, summarise } from './detail';
 
 const log = logger('agent');
 
-/** The sparkline for one turn: a bar per working tool call, speech excluded. */
-export const barsFor = (
-  steps: { toolCalls?: { toolName: string }[] }[]
-): ('ok' | 'run' | 'spawn')[] =>
-  steps
-    .flatMap(step => step.toolCalls ?? [])
-    .filter(call => !SPEECH.has(call.toolName))
-    .map(call => (call.toolName === 'run_agent' ? 'spawn' : 'ok'));
+export { SILENT };
+
+/**
+ * How one tool call reads in the feed: its state, and the name shown against
+ * it. Working calls keep their tool name in mono; the three an agent is
+ * *judged* by — talking, writing, revising — get a sentence instead, because
+ * "Wren commented" is what the reader is scanning for, not `send_chat_message`.
+ */
+const FEED = {
+  send_chat_message: { state: 'say', verb: 'commented' },
+  write_document: { state: 'doc', verb: 'wrote document' },
+  update_document: { state: 'doc', verb: 'updated document' },
+  run_agent: { state: 'spawn', verb: null }
+} as const;
+
+export type FeedState = 'ok' | 'run' | 'spawn' | 'say' | 'doc';
+
+/** The state one tool call carries in the feed. */
+export const stateFor = (toolName: string): FeedState =>
+  FEED[toolName as keyof typeof FEED]?.state ?? 'ok';
+
+/**
+ * The name shown against one call. A sentence for the three that read as the
+ * agent acting in the thread, the raw tool name for the rest.
+ */
+export const nameFor = (agentName: string, toolName: string) => {
+  const verb = FEED[toolName as keyof typeof FEED]?.verb;
+  return verb ? `${agentName} ${verb}` : toolName;
+};
 
 /**
  * The transcript the model sees. Activity strips are skipped — they summarise
@@ -42,9 +54,13 @@ const transcript = async (threadId: string) => {
 };
 
 /**
- * Writes one agent's tool calls into `steps` and drops a collapsed strip into
- * the thread. Speech is excluded: `send_chat_message` already produced a
- * message entry, and showing it again as a tool call would double it up.
+ * Writes one agent's turn into `steps` — the whole turn, not just the tools.
+ * A comment, a document write and a search all land here in the order they
+ * happened, because the feed is the one place that answers "what went on in
+ * this thread".
+ *
+ * The chat stream still carries the comment itself; this row is the same event
+ * seen from the activity side, which is why it holds only a summary of it.
  */
 export const recordSteps = async (
   threadId: string,
@@ -52,31 +68,28 @@ export const recordSteps = async (
   steps: { toolCalls?: { toolName: string; input: unknown }[] }[],
   timings: number[] = []
 ) => {
-  const bars = barsFor(steps);
-  if (!bars.length) return;
-
-  const working = steps
+  const calls = steps
     .flatMap(step => step.toolCalls ?? [])
-    .filter(call => !SPEECH.has(call.toolName));
+    .filter(call => !SILENT.has(call.toolName));
 
-  for (const [i, call] of working.entries())
+  for (const [i, call] of calls.entries()) {
+    const state = stateFor(call.toolName);
     await appendStep({
       threadId,
       groupLabel: label,
-      state: bars[i],
-      name: call.toolName,
-      detail: detailOf(call.input),
+      state,
+      name: nameFor(label, call.toolName),
+      detail: summarise(call.input),
       /**
-       * `traced` pushes one entry per working call, in the order they ran, so
-       * the indexes line up with `working`. A short turn can still come up
-       * empty — a call that never reached the wrapper has no timing, and the
-       * row renders as running rather than claiming a duration it never had.
+       * `traced` records one timing per call it wraps, in the order they ran,
+       * so the indexes line up with `calls`. A call that never reached the
+       * wrapper has none, and the row stays `running` rather than claiming a
+       * duration it never had.
        */
       durationMs: timings[i] ?? null,
-      badge: bars[i] === 'spawn' ? 'agent' : undefined
+      badge: state === 'spawn' ? 'agent' : undefined
     });
-
-  await appendActivity({ threadId, label: `${label} · ${bars.length} tools`, bars });
+  }
 };
 
 const agentRow = async (id: string) => {

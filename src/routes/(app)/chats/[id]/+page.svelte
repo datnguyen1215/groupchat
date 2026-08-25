@@ -12,7 +12,9 @@
   const log = trace('ChatPage');
 
   const thread = $derived(data.thread);
-  const steps = $derived(data.activity.reduce((n, g) => n + g.steps.length, 0));
+  /** The identity the panel-collapse effect keys on; a fresh object must not fire it. */
+  const threadId = $derived(data.thread.id);
+  const events = $derived(data.activity.reduce((n, g) => n + g.steps.length, 0));
 
   let activityOpen = $state(false);
   let docsOpen = $state(false);
@@ -56,9 +58,15 @@
     await invalidateAll();
   };
 
-  /* Panels are per-thread affordances; collapse them when the thread changes. */
+  /**
+   * Panels are per-thread affordances; collapse them when the thread changes.
+   *
+   * Keyed on the id alone. Reading any other field — `thread.name` did — reruns
+   * this on every live reload, since each one brings a fresh object, and the
+   * panels the reader had open would close under an agent's write.
+   */
   $effect(() => {
-    log.info({ threadId: thread.id, name: thread.name }, 'thread opened');
+    log.info({ threadId }, 'thread opened');
     activityOpen = false;
     docsOpen = false;
     renaming = false;
@@ -102,7 +110,7 @@
         log.info({ threadId: thread.id, open: activityOpen }, 'activity toggled');
       }}
     >
-      Activity · {steps}
+      Activity · {events}
     </button>
     <button
       class="rounded-[7px] border border-line px-[11px] py-[5px] text-[12.5px] text-ink-2 hover:border-ink-3 hover:text-ink"
@@ -119,16 +127,11 @@
 
   <div class="flex min-h-0 flex-1">
     <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-      <Conversation
-        bind:this={conversation}
-        entries={data.entries}
-        busy={data.busy}
-        onopenactivity={() => (activityOpen = true)}
-      />
+      <Conversation bind:this={conversation} entries={data.entries} busy={data.busy} />
       <Composer onsend={() => conversation.pinToBottom()} />
       <ActivityDrawer
         groups={data.activity}
-        count={steps}
+        count={events}
         open={activityOpen}
         onclose={() => (activityOpen = false)}
       />

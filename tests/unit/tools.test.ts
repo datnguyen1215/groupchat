@@ -61,8 +61,7 @@ describe('document tools are scoped to the thread', () => {
       listDocuments: async (threadId?: string) =>
         threadId ? docs.filter(d => d.threadId === threadId) : docs,
       getDocument: async (id: string) => docs.find(d => d.id === id) ?? null,
-      uniqueId: async (_t: unknown, name: string) => name,
-      db: {},
+      createDocument: async (input: { name: string }) => input.name,
       appendMessage: async () => 'entry-1',
       listSkills: async () => [],
       getSkill: async () => null,
@@ -105,7 +104,7 @@ describe('document tools are scoped to the thread', () => {
  * One live document per name, per thread. The orchestrator's habit is to record
  * a decision as a brand-new document rather than an edit to the one it decided
  * on, which leaves two documents of the same name and no way to tell which is
- * current. `uniqueId` would have suffixed the id and hidden the collision.
+ * current. Ids are generated, so nothing else catches the collision.
  */
 describe('write_document refuses a name the thread already uses', () => {
   const build = async (docs: { id: string; name: string; threadId: string }[]) => {
@@ -119,7 +118,7 @@ describe('write_document refuses a name the thread already uses', () => {
       listDocuments: async (threadId?: string) =>
         threadId ? docs.filter(d => d.threadId === threadId) : docs,
       getDocument: async (id: string) => docs.find(d => d.id === id) ?? null,
-      uniqueId: async (_t: unknown, name: string) => name,
+      createDocument: async (input: { name: string }) => input.name,
       appendMessage: async () => 'entry-1',
       listSkills: async () => [],
       getSkill: async () => null,

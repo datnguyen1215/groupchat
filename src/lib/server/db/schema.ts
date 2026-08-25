@@ -103,12 +103,17 @@ export const documents = pgTable('documents', {
 });
 
 /**
- * One table for message, activity-strip and error entries — they interleave in
- * one ordered stream, and splitting them means merge-sorting on read.
+ * One table for message and error entries — they interleave in one ordered
+ * stream, and splitting them means merge-sorting on read.
  *
  * An `error` is deliberately not a message. A failed turn is not an agent
  * choosing to speak, so it carries no `authorId` and renders without an avatar
  * or a name; `label` holds the one safe line it is allowed to show.
+ */
+/**
+ * `activity` is retired: the feed reads `steps`, so the stream is people
+ * talking and failures only. The value stays in the enum because Postgres
+ * cannot drop one, and old rows still carry it.
  */
 export const entryKind = pgEnum('entry_kind', ['message', 'activity', 'error']);
 
@@ -130,9 +135,15 @@ export const entries = pgTable('entries', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
 
-export const stepState = pgEnum('step_state', ['ok', 'run', 'spawn']);
+/**
+ * What one activity row is. `ok`/`run`/`spawn` are tool calls; `say` is an
+ * agent commenting, `doc` is a document written or updated. All four land in
+ * the same table because the drawer shows one timeline, and splitting them
+ * means merge-sorting on read.
+ */
+export const stepState = pgEnum('step_state', ['ok', 'run', 'spawn', 'say', 'doc']);
 
-/** The activity drawer's trace. `parentId` is the sub-agent indent. */
+/** The activity feed's trace. `parentId` is the sub-agent indent. */
 export const steps = pgTable('steps', {
   id: text('id').primaryKey(),
   threadId: text('thread_id')

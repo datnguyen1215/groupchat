@@ -5,15 +5,17 @@ import { documents, skills } from '../db/schema';
 import { eq, sql } from 'drizzle-orm';
 import {
   appendMessage,
+  createDocument,
+  deleteDocument,
   getDocument,
   getSkill,
   listAgents,
   listDocuments,
   listSkills,
-  uniqueId
+  updateDocument
 } from '../repo';
 import { logger, since } from '../logger';
-import { SPEECH, detailOf } from './detail';
+import { SILENT, summarise } from './detail';
 
 const log = logger('tool');
 
@@ -27,27 +29,6 @@ const log = logger('tool');
  * the default stream — and summarised at `info` by `summarise`.
  */
 
-/**
- * The `info` summary of a tool's input.
- *
- * `detailOf` alone is not enough here: it only reads string values, and the
- * most interesting call — `send_chat_message` — carries `{ paragraphs: [...] }`,
- * so it would log a blank detail on the one line worth reading. Arrays of
- * strings are joined first; the drawer never sees these tools, so this stays
- * out of `detailOf` rather than changing what the drawer renders.
- */
-const summarise = (input: unknown) => {
-  const direct = detailOf(input);
-  if (direct || !input || typeof input !== 'object') return direct;
-
-  const joined = Object.values(input as Record<string, unknown>)
-    .filter((v): v is string[] => Array.isArray(v) && v.every(x => typeof x === 'string'))
-    .map(v => v.join(' '))
-    .find(Boolean);
-
-  if (!joined) return '';
-  return joined.length > 80 ? `${joined.slice(0, 77)}...` : joined;
-};
 const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T => {
   const wrapped = Object.entries(tools).map(([name, definition]) => {
     const run = definition.execute;
@@ -60,7 +41,7 @@ const traced = <T extends Record<string, any>>(ctx: ToolContext, tools: T): T =>
 
       /** Both paths record: a call that threw still took the time it took. */
       const record = () => {
-        if (ctx.timings && !SPEECH.has(name)) ctx.timings.push(since(start));
+        if (ctx.timings && !SILENT.has(name)) ctx.timings.push(since(start));
       };
 
       try {
@@ -242,8 +223,9 @@ const writeTools = (ctx: ToolContext) => ({
        * A second document under a name the thread already uses is the
        * duplicate this tool exists to prevent — most often an orchestrator
        * recording a decision as a fresh copy of the document it decided on.
-       * `uniqueId` would quietly suffix it, leaving the thread with two
-       * documents of the same name and no way to tell which one is current.
+       * Ids are generated, so nothing else catches it: the thread would just
+       * hold two documents of the same name with no way to tell which is
+       * current.
        */
       const clash = (await listDocuments(ctx.threadId)).find(
         d => d.name.toLowerCase() === name.trim().toLowerCase()
@@ -254,10 +236,12 @@ const writeTools = (ctx: ToolContext) => ({
           id: clash.id
         };
 
-      const id = await uniqueId(documents, name);
-      await db
-        .insert(documents)
-        .values({ id, name, threadId: ctx.threadId, authorId: ctx.agentId, body });
+      const id = await createDocument({
+        name,
+        threadId: ctx.threadId,
+        authorId: ctx.agentId,
+        body
+      });
       return { id, name };
     }
   }),
@@ -278,16 +262,8 @@ const writeTools = (ctx: ToolContext) => ({
       if (doc.threadId !== ctx.threadId)
         return { error: `Document "${id}" belongs to another thread.` };
 
-      await db
-        .update(documents)
-        .set({
-          body,
-          ...(name ? { name } : {}),
-          /** The same in-place bump the PATCH route does, so both paths agree. */
-          version: sql`${documents.version} + 1`,
-          updatedAt: new Date()
-        })
-        .where(eq(documents.id, id));
+      /** Same repo call the PATCH route makes, so both paths bump alike. */
+      await updateDocument(id, { body, ...(name ? { name } : {}) });
 
       return { id, name: name ?? doc.name, version: doc.versionNumber + 1 };
     }
@@ -307,7 +283,7 @@ const writeTools = (ctx: ToolContext) => ({
         return { error: `Document "${id}" belongs to another thread.` };
 
       /** Messages referencing it keep their chip; `entries.doc_id` nulls out. */
-      await db.delete(documents).where(eq(documents.id, id));
+      await deleteDocument(id);
       return { id, deleted: true };
     }
   }),

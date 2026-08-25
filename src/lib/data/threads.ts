@@ -12,18 +12,16 @@ export type Message = {
   docId?: string;
 };
 
-export type ActivityStrip = {
-  kind: 'activity';
-  id: string;
-  label: string;
-  bars: ('ok' | 'run' | 'spawn')[];
-};
+export type Entry = Message;
 
-export type Entry = Message | ActivityStrip;
-
+/**
+ * One thing that happened in the thread. `ok`/`run`/`spawn` are tool calls,
+ * `say` is an agent commenting, `doc` is a document written or updated — the
+ * feed shows all of them on one clock.
+ */
 export type Step = {
   id: string;
-  state: 'ok' | 'run' | 'spawn';
+  state: 'ok' | 'run' | 'spawn' | 'say' | 'doc';
   name: string;
   detail: string;
   duration: string;
@@ -96,12 +94,6 @@ const retrievalEval: Thread = {
       ]
     },
     {
-      kind: 'activity',
-      id: 'a1',
-      label: 'Wren ran 4 tools, spawned 3 agents · 29s',
-      bars: ['ok', 'ok', 'spawn', 'ok', 'ok', 'ok', 'ok']
-    },
-    {
       kind: 'message',
       id: 'm4',
       author: 'Wren',
@@ -141,12 +133,6 @@ const retrievalEval: Thread = {
       isYou: true,
       time: '10:11',
       paragraphs: ['Use LLM-as-judge for the first pass. Human spot-check 10%.']
-    },
-    {
-      kind: 'activity',
-      id: 'a2',
-      label: 'Kestrel & Finch ran 3 tools · 1 running',
-      bars: ['ok', 'ok', 'run']
     },
     {
       kind: 'message',
@@ -308,12 +294,6 @@ const ablation: Thread = {
         'Factorial over window and depth. The catch is they are confounded through total tokens.'
       ],
       docId: 'ablation-design'
-    },
-    {
-      kind: 'activity',
-      id: 'b3',
-      label: 'Kestrel ran 6 tools · 1 running',
-      bars: ['ok', 'ok', 'ok', 'ok', 'ok', 'run']
     },
     {
       kind: 'message',

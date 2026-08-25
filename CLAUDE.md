@@ -35,6 +35,13 @@
 - Pick unit for logic, e2e for user flows. When unsure, write both.
 - No feature is done until its tests pass.
 
+## Command output
+
+- Redirect long-running commands to a log file: `npm test > ~/tmp/test.log 2>&1`.
+- Applies to test runs, builds, dev servers, migrations — anything noisy.
+- Name the file after the task: `~/tmp/groupchat-<task>.log`.
+- Read the log to inspect results. Tell the user the path when it matters.
+
 ## Live updates
 
 - SSE pushes thread changes to the browser. One stream for the whole app.
@@ -80,6 +87,14 @@ Before merging a branch into `master`, in order:
 - Multiple agents run at once. Another agent may already hold the port.
 - Check the port is free before starting a test server: `ss -ltn | grep :10302`.
 - Taken? Use the next free port in the 10200+ range for that run. Do not kill the process holding it.
+
+## Test isolation
+
+- The e2e suite generates its own Postgres schema per run (`test_<pid>`).
+  Do not pin `DATABASE_SCHEMA` — a shared name lets one agent's run wipe another's.
+- Tests are served from `127.0.0.1`, not `localhost`. Cookies ignore the port,
+  so `localhost` shares a jar with the dev server on :10200 and signs you out.
+- Never hardcode a host in a test. Assert against `testInfo.project.use.baseURL`.
 
 ## Reports
 
