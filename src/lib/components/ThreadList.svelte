@@ -2,6 +2,7 @@
   import { goto, invalidateAll } from '$app/navigation';
   import { page } from '$app/state';
   import Icon from './Icon.svelte';
+  import { createThread } from '$lib/threads';
   import { trace } from '$lib/logger.svelte';
 
   const log = trace('ThreadList');
@@ -30,18 +31,8 @@
   let pending = $state<{ id: string; name: string } | null>(null);
 
   const create = async () => {
-    log.info('create thread');
-    const res = await fetch('/api/threads', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Untitled' })
-    });
-    if (!res.ok) {
-      log.error({ status: res.status }, 'create failed');
-      return;
-    }
-    const { thread } = await res.json();
-    log.info({ threadId: thread.id }, 'created');
+    const thread = await createThread();
+    if (!thread) return;
     await invalidateAll();
     await goto(`/chats/${thread.id}`);
     startRename(thread.id, thread.name);

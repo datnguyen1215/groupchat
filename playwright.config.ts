@@ -57,6 +57,22 @@ export default defineConfig({
       }
     },
     /**
+     * Empties the thread table, so it cannot share the schema with anything.
+     * `dependencies` makes it wait for the parallel projects to finish, and one
+     * worker keeps it alone once it starts; it reseeds the baseline afterwards.
+     */
+    {
+      name: 'solo',
+      testMatch: /e2e\/solo\/.*\.spec\.ts/,
+      dependencies: ['api', 'ui', 'auth'],
+      workers: 1,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        storageState: STORAGE_STATE
+      }
+    },
+    /**
      * The auth flows themselves must start signed out, so this project opts out
      * of the shared cookie instead of inheriting it.
      */
