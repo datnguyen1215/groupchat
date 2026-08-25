@@ -4,6 +4,10 @@
 
   const log = trace('Composer');
 
+  /* Sending is an intent to see your own message, wherever the stream was. */
+  type Props = { onsend: () => void };
+  const { onsend }: Props = $props();
+
   /* Eight lines at 13.5px/1.5, the realistic ceiling for a chat message. */
   const MAX_HEIGHT = 168;
 
@@ -38,6 +42,7 @@
 
     /* Clear optimistically; the redirect re-renders the thread with it stored. */
     draft = '';
+    onsend();
     return async ({ update, result }) => {
       log.info({ type: result.type }, 'submit settled');
       await update();

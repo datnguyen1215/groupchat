@@ -142,6 +142,24 @@ test('leaves the view alone when the user has scrolled up to read history', asyn
   await expect(stream(page).getByText('arrived while reading history')).not.toBeInViewport();
 });
 
+test('sending your own message scrolls back down, even from up in the history', async ({
+  page
+}) => {
+  await seedTall(40);
+  await ready(page, `/chats/${THREAD}`);
+
+  /* Reading history, well clear of the bottom. */
+  await viewport(page).evaluate(el => (el.scrollTop = 0));
+
+  const box = page.getByPlaceholder('Message the group…');
+  await box.fill('my own message');
+  await box.press('Enter');
+
+  /* Your own message is the one thing that overrides having scrolled up. */
+  await expect(stream(page).getByText('my own message')).toBeInViewport();
+  await expectPinned(page);
+});
+
 test('resumes pinning once the user scrolls back down', async ({ page, request }) => {
   await seedTall(40);
   await ready(page, `/chats/${THREAD}`);

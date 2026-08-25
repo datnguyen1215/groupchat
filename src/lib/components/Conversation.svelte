@@ -50,6 +50,15 @@
   };
 
   /**
+   * Re-pins and jumps to the bottom. Exported for the composer: sending a
+   * message means you want to see it, even if you had scrolled up to read.
+   */
+  export const pinToBottom = () => {
+    pinned = true;
+    viewport.scrollTop = viewport.scrollHeight;
+  };
+
+  /**
    * Re-runs whenever the stream grows, and scrolls after the DOM has the new
    * entry. The two counts are read for their dependencies, not their values:
    * an effect only re-runs on what it read, so removing them stops the scroll.

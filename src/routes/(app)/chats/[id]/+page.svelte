@@ -17,6 +17,9 @@
   let activityOpen = $state(false);
   let docsOpen = $state(false);
 
+  /* Held so the composer can scroll the stream back down on send. */
+  let conversation: Conversation;
+
   /* Click the title to rename; the sidebar's context menu does the same thing. */
   let renaming = $state(false);
   let draft = $state('');
@@ -117,11 +120,12 @@
   <div class="flex min-h-0 flex-1">
     <div class="flex min-h-0 min-w-0 flex-1 flex-col">
       <Conversation
+        bind:this={conversation}
         entries={data.entries}
         busy={data.busy}
         onopenactivity={() => (activityOpen = true)}
       />
-      <Composer />
+      <Composer onsend={() => conversation.pinToBottom()} />
       <ActivityDrawer
         groups={data.activity}
         count={steps}
