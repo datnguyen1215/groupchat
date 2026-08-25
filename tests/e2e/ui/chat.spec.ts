@@ -178,3 +178,86 @@ test.describe('composer', () => {
     await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled();
   });
 });
+
+/**
+ * The box used to be a fixed `rows="1"`, so a wrapped message scrolled out of
+ * sight as you typed it. Height is a rendered value, not state, so these read it
+ * back off the element rather than asserting on the markup.
+ */
+test.describe('the composer grows with its text', () => {
+  /** Eight lines at 13.5px/1.5 — the cap the component stops growing at. */
+  const MAX = 168;
+  const ONE_LINE = 21;
+
+  const height = async (box: import('@playwright/test').Locator) =>
+    box.evaluate((el: HTMLTextAreaElement) => el.clientHeight);
+
+  /** Long enough to wrap, without depending on where any single word breaks. */
+  const wrapping = (times: number) =>
+    'The quick brown fox jumps over the lazy dog and keeps running. '.repeat(times).trim();
+
+  test('starts at one line', async ({ page }) => {
+    await seedEntries([]);
+    await ready(page, `/chats/${THREAD}`);
+
+    const box = page.getByPlaceholder('Message the group…');
+    expect(await height(box)).toBe(ONE_LINE);
+  });
+
+  test('gets taller as the message wraps', async ({ page }) => {
+    await seedEntries([]);
+    await ready(page, `/chats/${THREAD}`);
+
+    const box = page.getByPlaceholder('Message the group…');
+    await box.fill(wrapping(1));
+    const short = await height(box);
+
+    await box.fill(wrapping(4));
+    const tall = await height(box);
+
+    expect(tall).toBeGreaterThan(short);
+    expect(tall).toBeLessThanOrEqual(MAX);
+  });
+
+  test('stops at the cap and scrolls instead', async ({ page }) => {
+    await seedEntries([]);
+    await ready(page, `/chats/${THREAD}`);
+
+    const box = page.getByPlaceholder('Message the group…');
+    await box.fill(wrapping(40));
+
+    expect(await height(box)).toBe(MAX);
+
+    /* Past the cap the text must still be reachable, not clipped away. */
+    const scrollable = await box.evaluate(
+      (el: HTMLTextAreaElement) => el.scrollHeight > el.clientHeight
+    );
+    expect(scrollable).toBe(true);
+  });
+
+  test('shrinks back to one line after sending', async ({ page }) => {
+    await seedEntries([]);
+    await ready(page, `/chats/${THREAD}`);
+
+    const box = page.getByPlaceholder('Message the group…');
+    await box.fill(wrapping(4));
+    expect(await height(box)).toBeGreaterThan(ONE_LINE);
+
+    await box.press('Enter');
+    await expect(box).toHaveValue('');
+
+    await expect.poll(() => height(box)).toBe(ONE_LINE);
+  });
+
+  test('shrinks back when the text is deleted', async ({ page }) => {
+    await seedEntries([]);
+    await ready(page, `/chats/${THREAD}`);
+
+    const box = page.getByPlaceholder('Message the group…');
+    await box.fill(wrapping(4));
+    expect(await height(box)).toBeGreaterThan(ONE_LINE);
+
+    await box.fill('');
+    expect(await height(box)).toBe(ONE_LINE);
+  });
+});
