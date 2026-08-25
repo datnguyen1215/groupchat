@@ -69,7 +69,8 @@ vi.mock('../../src/lib/server/browser/server', () => ({
   stopBrowserServer: async () => {},
   serverRunning: () => false,
   BROWSER_PORT: 10205,
-  STATE_FILE: '/tmp/state.json'
+  STATE_FILE: '/tmp/state.json',
+  OUTPUT_DIR: '/tmp/browser-output'
 }));
 
 const load = async () => (await import('../../src/lib/server/browser')).browserTools('thread-a');
@@ -205,12 +206,17 @@ describe('when something goes wrong', () => {
 });
 
 describe('acting on a page', () => {
-  it('clicks by ref', async () => {
+  /**
+   * The agent says `ref`, because that is what the snapshot prints beside every
+   * element. The server wants the same value under `target`. Getting this wrong
+   * makes every click fail, and nothing else in the suite would notice.
+   */
+  it('clicks by ref, passing it to the server as target', async () => {
     await run('browser_click', { element: 'the Sign in button', ref: 'e42' });
 
     expect(lastCall).toEqual({
       name: 'browser_click',
-      input: { element: 'the Sign in button', ref: 'e42' }
+      input: { element: 'the Sign in button', target: 'e42' }
     });
   });
 
@@ -222,7 +228,7 @@ describe('acting on a page', () => {
       submit: true
     });
 
-    expect(lastCall?.input).toMatchObject({ ref: 'e7', text: 'web scraping', submit: true });
+    expect(lastCall?.input).toMatchObject({ target: 'e7', text: 'web scraping', submit: true });
   });
 
   /** Named `browser_back` for the agent, but it is the server's navigate_back. */

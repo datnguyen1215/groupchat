@@ -19,7 +19,8 @@ vi.mock('../../src/lib/server/browser/server', () => ({
   stopBrowserServer: async () => {},
   serverRunning: () => true,
   BROWSER_PORT: 10205,
-  STATE_FILE: '/tmp/state.json'
+  STATE_FILE: '/tmp/state.json',
+  OUTPUT_DIR: '/tmp/browser-output'
 }));
 
 vi.mock('@ai-sdk/mcp', () => ({
