@@ -5,13 +5,7 @@ import { eq } from 'drizzle-orm';
 import { MAX_STEPS, chatModel, noThinking } from './model';
 import { orchestratorPrompt, workerPrompt } from './prompts';
 import { orchestratorTools, workerTools, type ToolContext } from './tools';
-import {
-  BLOCKED,
-  appendError,
-  appendStep,
-  listEntries,
-  setAgentStatus
-} from '../repo';
+import { BLOCKED, appendError, appendStep, listEntries, setAgentStatus } from '../repo';
 import { logger, since } from '../logger';
 import { summarise } from './detail';
 
