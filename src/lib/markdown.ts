@@ -2,6 +2,7 @@ export type Block =
   | { type: 'heading'; level: 1 | 2 | 3; text: string }
   | { type: 'paragraph'; text: string }
   | { type: 'list'; items: string[] }
+  | { type: 'ordered'; items: string[] }
   | { type: 'quote'; text: string }
   | { type: 'code'; text: string }
   | { type: 'table'; head: string[]; rows: string[][] }
@@ -12,6 +13,9 @@ const splitRow = (line: string) =>
     .replace(/^\||\|$/g, '')
     .split('|')
     .map(c => c.trim());
+
+/** `1. ` through `999. `. The marker is dropped; the renderer numbers the items itself. */
+const ORDERED = /^\d+\.\s+/;
 
 const isDivider = (line: string) => /^\|?[\s:|-]+\|[\s:|-]*$/.test(line);
 
@@ -69,6 +73,14 @@ export const parseMarkdown = (source: string): Block[] => {
       continue;
     }
 
+    if (ORDERED.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && ORDERED.test(lines[i]))
+        items.push(lines[i++].replace(ORDERED, ''));
+      blocks.push({ type: 'ordered', items });
+      continue;
+    }
+
     if (line.startsWith('|') && isDivider(lines[i + 1] ?? '')) {
       const head = splitRow(line);
       i += 2;
@@ -84,7 +96,13 @@ export const parseMarkdown = (source: string): Block[] => {
      * consuming nothing, leaving `i` where it was, and spinning this loop.
      */
     const body: string[] = [lines[i++]];
-    while (i < lines.length && lines[i].trim() && !/^[#>|`-]/.test(lines[i])) body.push(lines[i++]);
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !/^[#>|`-]/.test(lines[i]) &&
+      !ORDERED.test(lines[i])
+    )
+      body.push(lines[i++]);
     blocks.push({ type: 'paragraph', text: body.join(' ') });
   }
 
