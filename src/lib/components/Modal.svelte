@@ -7,9 +7,11 @@
     onclose: () => void;
     body: Snippet;
     footer?: Snippet;
+    /** Tailwind max-width class. Documents read wide; short dialogs stay narrow. */
+    width?: string;
   };
 
-  const { title, meta, onclose, body, footer }: Props = $props();
+  const { title, meta, onclose, body, footer, width = 'max-w-[780px]' }: Props = $props();
 
   const onkeydown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') onclose();
@@ -25,7 +27,7 @@
   <button class="absolute inset-0 cursor-default" onclick={onclose} aria-label="Close" tabindex="-1"
   ></button>
   <div
-    class="on-panel relative flex max-h-[90vh] w-full max-w-[780px] flex-col overflow-hidden rounded-[15px] border border-line bg-panel shadow-[0_24px_70px_rgba(0,0,0,.6)]"
+    class="on-panel relative flex max-h-[90vh] w-full {width} flex-col overflow-hidden rounded-[15px] border border-line bg-panel shadow-[0_24px_70px_rgba(0,0,0,.6)]"
     role="dialog"
     aria-modal="true"
     aria-label={title}
