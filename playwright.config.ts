@@ -1,20 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import { SCHEMA } from './tests/support/run';
 import { STORAGE_STATE } from './tests/support/auth';
 
 const PORT = Number(process.env.TEST_PORT || 10302);
-
-/**
- * Several agents run this suite at once, so a run cannot take the fixed schema
- * name: global setup drops and rebuilds whatever it is handed, which would wipe
- * a concurrent run mid-flight. Each run gets its own schema, keyed on the pid.
- */
-const SCHEMA = process.env.DATABASE_SCHEMA || `test_${process.pid}`;
-
-/**
- * `tests/support/*` read this directly rather than through the config, so global
- * setup and the dev server must agree on the same generated name.
- */
-process.env.DATABASE_SCHEMA = SCHEMA;
 
 /**
  * Cookies are keyed by host and ignore the port, so a suite served from
@@ -31,6 +19,8 @@ const HOST = process.env.TEST_HOST || '127.0.0.1';
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  /* Traces and error context, like the cookie, cannot share a path across runs. */
+  outputDir: `test-results/${SCHEMA}`,
   globalSetup: './tests/support/global-setup.ts',
   globalTeardown: './tests/support/global-teardown.ts',
   fullyParallel: true,

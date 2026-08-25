@@ -2,12 +2,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import postgres from 'postgres';
 import { databaseUrl } from '../../src/lib/server/db/url';
+import { SCHEMA } from './run';
 
 /**
  * Test data lives in its own Postgres schema, never `public`. Tests can then run
  * against the same container as development without colliding with it.
  */
-export const TEST_SCHEMA = process.env.DATABASE_SCHEMA || 'test';
+export const TEST_SCHEMA = SCHEMA;
 
 export const connect = (schema = TEST_SCHEMA) =>
   postgres(databaseUrl(process.env.DATABASE_URL), { connection: { search_path: schema }, max: 4 });
