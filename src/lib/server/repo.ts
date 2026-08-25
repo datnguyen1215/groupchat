@@ -362,6 +362,32 @@ export const appendMessage = async (input: {
   return id;
 };
 
+/**
+ * Appends one failure. Not a message: an error has no author, so it renders
+ * without an avatar or a name and cannot be read as an agent choosing to speak.
+ *
+ * `line` is already-safe wording — see `describe()` in `ai/loop.ts`. Provider
+ * text never reaches this function; it goes to the log instead.
+ */
+export const appendError = async (input: { threadId: string; line: string }) => {
+  const seq = await nextSeq(input.threadId);
+  const id = randomUUID();
+  await db.insert(entries).values({
+    id,
+    threadId: input.threadId,
+    kind: 'error',
+    seq,
+    label: input.line
+  });
+  log.info({ id, threadId: input.threadId, line: input.line }, 'error appended');
+
+  /** Same as a message: the thread has new content, so recency reorders it. */
+  await db.update(threads).set({ updatedAt: new Date() }).where(eq(threads.id, input.threadId));
+  publish({ scope: 'thread', threadId: input.threadId });
+  publish({ scope: 'threads' });
+  return id;
+};
+
 /** The collapsed sparkline that summarises one agent's tool run. */
 export const appendActivity = async (input: {
   threadId: string;

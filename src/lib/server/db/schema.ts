@@ -103,10 +103,14 @@ export const documents = pgTable('documents', {
 });
 
 /**
- * One table for both message and activity-strip entries — they interleave in one
- * ordered stream, and splitting them means merge-sorting on read.
+ * One table for message, activity-strip and error entries — they interleave in
+ * one ordered stream, and splitting them means merge-sorting on read.
+ *
+ * An `error` is deliberately not a message. A failed turn is not an agent
+ * choosing to speak, so it carries no `authorId` and renders without an avatar
+ * or a name; `label` holds the one safe line it is allowed to show.
  */
-export const entryKind = pgEnum('entry_kind', ['message', 'activity']);
+export const entryKind = pgEnum('entry_kind', ['message', 'activity', 'error']);
 
 export const entries = pgTable('entries', {
   id: text('id').primaryKey(),
@@ -120,7 +124,7 @@ export const entries = pgTable('entries', {
   tag: text('tag'),
   paragraphs: jsonb('paragraphs').$type<string[]>().notNull().default([]),
   docId: text('doc_id').references(() => documents.id, { onDelete: 'set null' }),
-  /** Activity strips only: the sparkline. */
+  /** Activity strips: the strip's caption. Errors: the one safe line to show. */
   label: text('label'),
   bars: jsonb('bars').$type<('ok' | 'run' | 'spawn')[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()

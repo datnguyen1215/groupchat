@@ -8,7 +8,7 @@
   import PresenceRow from './PresenceRow.svelte';
 
   type Entry = {
-    kind: 'message' | 'activity';
+    kind: 'message' | 'activity' | 'error';
     id: string;
     author: string;
     initials: string;
@@ -54,6 +54,17 @@
             </span>
             {entry.label}
           </button>
+        </div>
+      {:else if entry.kind === 'error'}
+        <!-- A failure, not an agent talking: no avatar, no name, no tag. -->
+        <div class="mb-5 flex items-center gap-[10px] pl-[30px]">
+          <span class="h-px flex-1 bg-line"></span>
+          <span class="flex items-center gap-[6px] text-[11px] whitespace-nowrap text-clay/80">
+            <Icon name="warn" />
+            {entry.label}
+            <span class="text-ink-3">· {entry.time}</span>
+          </span>
+          <span class="h-px flex-1 bg-line"></span>
         </div>
       {:else}
         <article class="mb-5">
