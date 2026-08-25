@@ -98,6 +98,69 @@ export const getDocument = async (id: string) => {
   return documentDto(row, authors.get(row.authorId) ?? null, threadNames.get(row.threadId) ?? null);
 };
 
+/**
+ * The document writes, here rather than in the routes that used to own them:
+ * a write that skips this module skips the publish, and a document that lands
+ * without one is invisible until the next navigation. Both the REST routes and
+ * the agents' tools go through these.
+ *
+ * `threads` is published alongside `thread`: the documents the layout loads for
+ * the modals are app-wide, not thread-scoped, so a thread-only event would
+ * leave every other page's copy stale.
+ */
+const publishDoc = (threadId: string) => {
+  publish({ scope: 'thread', threadId });
+  publish({ scope: 'threads' });
+};
+
+export const createDocument = async (input: {
+  name: string;
+  threadId: string;
+  authorId: string;
+  body: string;
+}) => {
+  const id = documentId();
+  await db.insert(documents).values({ ...input, id });
+  log.info({ id, docName: input.name, threadId: input.threadId }, 'document created');
+  publishDoc(input.threadId);
+  return id;
+};
+
+export const updateDocument = async (
+  id: string,
+  patch: { name?: string; body?: string; threadId?: string }
+) => {
+  const [row] = await db
+    .update(documents)
+    .set({
+      ...patch,
+      /** A rename or a rewrite is a revision; a move between threads is not. */
+      ...(patch.name !== undefined || patch.body !== undefined
+        ? { version: sql`${documents.version} + 1` }
+        : {}),
+      updatedAt: new Date()
+    })
+    .where(eq(documents.id, id))
+    .returning({ threadId: documents.threadId });
+
+  if (!row) return null;
+  log.info({ id, fields: Object.keys(patch) }, 'document updated');
+  publishDoc(row.threadId);
+  return row;
+};
+
+export const deleteDocument = async (id: string) => {
+  const [row] = await db
+    .delete(documents)
+    .where(eq(documents.id, id))
+    .returning({ threadId: documents.threadId });
+
+  if (!row) return null;
+  log.info({ id }, 'document deleted');
+  publishDoc(row.threadId);
+  return row;
+};
+
 const threadNameIndex = async (ids: string[]) => {
   const unique = [...new Set(ids)];
   const index = new Map<string, string>();
@@ -207,11 +270,18 @@ export const agentExists = async (id: string) => {
   return Boolean(row);
 };
 
+/**
+ * A document's id, which is a UUID and not a slug of its name.
+ *
+ * Documents are the one table agents rename freely, and a name-derived id has
+ * to change when the name does — orphaning every reference already held: the
+ * `entries.doc_id` on a posted chip, and the id an open modal is reading. The
+ * same reasoning `createThread` gives for its UUID applies here.
+ */
+export const documentId = () => randomUUID();
+
 /** Slug from the name, suffixed until it does not collide. */
-export const uniqueId = async (
-  table: typeof skills | typeof documents | typeof agents,
-  name: string
-) => {
+export const uniqueId = async (table: typeof skills | typeof agents, name: string) => {
   const base = slugify(name);
   const rows = await db
     .select({ id: table.id })

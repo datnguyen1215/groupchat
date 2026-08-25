@@ -12,6 +12,8 @@
   const log = trace('ChatPage');
 
   const thread = $derived(data.thread);
+  /** The identity the panel-collapse effect keys on; a fresh object must not fire it. */
+  const threadId = $derived(data.thread.id);
   const steps = $derived(data.activity.reduce((n, g) => n + g.steps.length, 0));
 
   let activityOpen = $state(false);
@@ -56,9 +58,15 @@
     await invalidateAll();
   };
 
-  /* Panels are per-thread affordances; collapse them when the thread changes. */
+  /**
+   * Panels are per-thread affordances; collapse them when the thread changes.
+   *
+   * Keyed on the id alone. Reading any other field — `thread.name` did — reruns
+   * this on every live reload, since each one brings a fresh object, and the
+   * panels the reader had open would close under an agent's write.
+   */
   $effect(() => {
-    log.info({ threadId: thread.id, name: thread.name }, 'thread opened');
+    log.info({ threadId }, 'thread opened');
     activityOpen = false;
     docsOpen = false;
     renaming = false;
