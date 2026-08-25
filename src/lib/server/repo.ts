@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, ne, sql } from 'drizzle-orm';
 import { db } from './db';
 import { agentSkills, agents, documents, entries, skills, steps, threads } from './db/schema';
 import { agentDto, documentDto, skillDto, type Stat } from './serialize';
@@ -13,6 +13,15 @@ import { logger } from './logger';
  * backwards from when the data is wrong.
  */
 const log = logger('repo');
+
+/**
+ * The status label an agent carries while parked inside `run_agent`, waiting on
+ * the workers it delegated to. It still holds a `busy` row — the turn is not
+ * over and `clearStaleBusy` must still be able to reach it — but it is not
+ * doing anything a presence row can usefully report, so `listBusyAgents` skips
+ * it. Exported because `loop.ts` sets it and this is the only definition.
+ */
+export const BLOCKED = 'Delegating';
 
 /**
  * Read helpers shared by the routes. Each returns the frontend-facing DTO, so a
@@ -553,12 +562,25 @@ export const clearStaleBusy = async (olderThanMs = 5 * 60_000) => {
     publish({ scope: 'thread', threadId: id });
 };
 
-/** Presence rows: who is mid-turn in this thread, and the last step each ran. */
+/**
+ * Presence rows: who is mid-turn in this thread, and the last step each ran.
+ *
+ * Agents parked in `run_agent` are left out. The orchestrator sits there for
+ * the whole of every delegated turn, and a row saying it is working competes
+ * with the workers that actually are. It reappears on its own when it goes
+ * back to composing.
+ */
 export const listBusyAgents = async (threadId: string) => {
   const rows = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.status, 'busy'), eq(agents.busyThreadId, threadId)));
+    .where(
+      and(
+        eq(agents.status, 'busy'),
+        eq(agents.busyThreadId, threadId),
+        ne(agents.statusLabel, BLOCKED)
+      )
+    );
   if (!rows.length) return [];
 
   const recent = await db

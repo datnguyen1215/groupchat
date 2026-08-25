@@ -57,6 +57,9 @@ const seed = async (rows: Row[]) => {
 const errorRow = (page: import('@playwright/test').Page) =>
   page.getByRole('status', { name: 'Error' });
 
+/** The sidebar previews the last message, so message assertions scope to the stream. */
+const stream = (page: import('@playwright/test').Page) => page.locator('article').locator('..');
+
 test.describe('the error entry', () => {
   test('shows the failure line', async ({ page }) => {
     await seed([
@@ -111,9 +114,9 @@ test.describe('the error entry', () => {
 
     await ready(page, `/chats/${THREAD}`);
 
-    await expect(page.getByText('first thing said')).toBeVisible();
+    await expect(stream(page).getByText('first thing said')).toBeVisible();
     await expect(errorRow(page)).toBeVisible();
-    await expect(page.getByText('second thing said')).toBeVisible();
+    await expect(stream(page).getByText('second thing said')).toBeVisible();
   });
 
   /** A worker failure names the agent; the orchestrator's does not. */

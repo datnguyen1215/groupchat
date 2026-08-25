@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * `loop.ts` reaches the database and `$env/dynamic/private` through its imports,
@@ -8,9 +8,24 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('$env/dynamic/private', () => ({ env: { DEEPSEEK_API_KEY: 'test' } }));
 vi.mock('../../src/lib/server/db', () => ({ db: {}, schema: {} }));
 
+/**
+ * `delegating` writes the status row it is hiding. The write is the behaviour
+ * under test, so the repo is stubbed and the calls are the assertion.
+ */
+const setAgentStatus = vi.fn();
+vi.mock('../../src/lib/server/repo', () => ({
+  BLOCKED: 'Delegating',
+  setAgentStatus: (...args: unknown[]) => setAgentStatus(...args),
+  appendActivity: vi.fn(),
+  appendError: vi.fn(),
+  appendStep: vi.fn(),
+  listEntries: vi.fn()
+}));
+
 const {
   SPEECH,
   barsFor,
+  delegating,
   describe: errorLine,
   sentence
 } = await import('../../src/lib/server/ai/loop');
@@ -148,5 +163,67 @@ describe('sentence', () => {
 
   it('tolerates an empty fragment', () => {
     expect(sentence('')).toBe('');
+  });
+});
+
+/**
+ * The orchestrator's row is hidden while it waits on delegates. What matters is
+ * the overlap: the SDK runs several `run_agent` calls from one step at the same
+ * time, and the row must stay hidden until the last one returns.
+ */
+describe('delegating', () => {
+  const statuses = () => setAgentStatus.mock.calls.map(c => c[2]);
+
+  beforeEach(() => setAgentStatus.mockClear());
+
+  it('hides the row while a delegate runs, and restores it after', async () => {
+    await delegating('orch', 't1', async () => 'report');
+
+    expect(statuses()).toEqual(['Delegating', 'Thinking']);
+  });
+
+  it('hands the delegate result straight back', async () => {
+    expect(await delegating('orch', 't1', async () => 'report')).toBe('report');
+  });
+
+  it('marks the row busy, not idle, so the turn keeps its presence', async () => {
+    await delegating('orch', 't1', async () => null);
+
+    expect(setAgentStatus.mock.calls.every(c => c[1] === 'busy')).toBe(true);
+  });
+
+  /* Two workers from one step. Restoring on the first return shows the row too early. */
+  it('stays hidden until the last of several concurrent delegates returns', async () => {
+    let releaseSlow: () => void = () => {};
+    const slow = new Promise<void>(resolve => (releaseSlow = resolve));
+
+    const first = delegating('orch', 't1', async () => 'fast');
+    const second = delegating('orch', 't1', () => slow.then(() => 'slow'));
+
+    await first;
+    expect(statuses()).toEqual(['Delegating']);
+
+    releaseSlow();
+    await second;
+    expect(statuses()).toEqual(['Delegating', 'Thinking']);
+  });
+
+  it('restores the row when a delegate throws', async () => {
+    await expect(
+      delegating('orch', 't1', async () => {
+        throw new Error('worker died');
+      })
+    ).rejects.toThrow('worker died');
+
+    expect(statuses()).toEqual(['Delegating', 'Thinking']);
+  });
+
+  /* A later turn must not inherit a count left behind by an earlier one. */
+  it('starts clean on a following turn', async () => {
+    await delegating('orch', 't1', async () => null);
+    setAgentStatus.mockClear();
+    await delegating('orch', 't1', async () => null);
+
+    expect(statuses()).toEqual(['Delegating', 'Thinking']);
   });
 });
