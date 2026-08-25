@@ -47,10 +47,12 @@ test('returns to the page that required signing in', async ({ page }) => {
   await expect(page).toHaveURL(thread);
 });
 
-test('ignores an off-site next target', async ({ page }) => {
+test('ignores an off-site next target', async ({ page }, testInfo) => {
   await signIn(page, TEST_USER.email, TEST_USER.password, '/login?next=https://example.com/evil');
 
-  /* An open redirect would have left the app entirely. */
-  await expect(page).toHaveURL(/localhost/);
+  /* An open redirect would have left the app entirely. Compare against the
+     configured base URL rather than a hardcoded host, which the suite varies. */
+  const { origin } = new URL(testInfo.project.use.baseURL!);
+  expect(new URL(page.url()).origin).toBe(origin);
   await expect(page).toHaveURL(/\/chats\//);
 });

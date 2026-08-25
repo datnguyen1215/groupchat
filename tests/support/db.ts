@@ -50,3 +50,14 @@ export const resetSchema = async (schema = TEST_SCHEMA) => {
     await root.end();
   }
 };
+
+/** Removes a run's schema once its suite is over. */
+export const dropSchema = async (schema = TEST_SCHEMA) => {
+  /* The cascade reports one NOTICE per dropped table; none of it is actionable. */
+  const root = postgres(databaseUrl(process.env.DATABASE_URL), { max: 1, onnotice: () => {} });
+  try {
+    await root.unsafe(`drop schema if exists "${schema}" cascade`);
+  } finally {
+    await root.end();
+  }
+};

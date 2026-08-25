@@ -1,9 +1,6 @@
 import type { RequestHandler } from './$types';
-import { eq, sql } from 'drizzle-orm';
-import { db } from '$lib/server/db';
-import { documents } from '$lib/server/db/schema';
 import { Fields, fail, ok, readJson } from '$lib/server/api';
-import { getDocument, threadExists } from '$lib/server/repo';
+import { deleteDocument, getDocument, threadExists, updateDocument } from '$lib/server/repo';
 
 export const GET: RequestHandler = async ({ params }) => {
   const document = await getDocument(params.id);
@@ -30,16 +27,7 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
   if (typeof patch.threadId === 'string' && !(await threadExists(patch.threadId)))
     fail(422, 'Validation failed', [{ field: 'threadId', message: 'no such thread' }]);
 
-  const revised = ['name', 'body'].some(k => k in patch);
-
-  await db
-    .update(documents)
-    .set({
-      ...patch,
-      ...(revised ? { version: sql`${documents.version} + 1` } : {}),
-      updatedAt: new Date()
-    })
-    .where(eq(documents.id, params.id));
+  await updateDocument(params.id, patch);
 
   return ok({ document: await getDocument(params.id) });
 };
@@ -49,6 +37,6 @@ export const DELETE: RequestHandler = async ({ params }) => {
   if (!existing) fail(404, 'Document not found');
 
   /** Messages referencing this doc keep their chip; `entries.doc_id` nulls out. */
-  await db.delete(documents).where(eq(documents.id, params.id));
+  await deleteDocument(params.id);
   return new Response(null, { status: 204 });
 };

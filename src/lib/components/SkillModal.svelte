@@ -5,22 +5,52 @@
   import Markdown from './Markdown.svelte';
   import Modal from './Modal.svelte';
 
-  const skill = $derived((page.data.skills as Skill[]).find(s => s.id === overlay.skillId));
+  /**
+   * Held, not looked up per render — same reason as `DocModal`: `page.data` is
+   * re-fetched by every live event, and a skill missing from one of those
+   * reloads would otherwise unmount the modal under the reader.
+   */
+  let shown = $state<Skill | null>(null);
+  let missing = $state(false);
 
   let tab = $state<'about' | 'used-by'>('about');
 
   $effect(() => {
-    if (skill) tab = 'about';
+    if (!overlay.skillId) {
+      shown = null;
+      missing = false;
+      return;
+    }
+
+    const found = (page.data.skills as Skill[]).find(s => s.id === overlay.skillId);
+    if (found) {
+      shown = found;
+      missing = false;
+    } else if (shown) {
+      missing = true;
+    }
+  });
+
+  /** Reset to About when a different skill opens, not on every live reload. */
+  $effect(() => {
+    overlay.skillId;
+    tab = 'about';
   });
 </script>
 
-{#if skill}
+{#if shown}
+  {@const it = shown}
   <Modal
-    title={skill.name}
-    meta="Written by {skill.author} · {skill.updated} · {skill.version} · used {skill.uses}×"
+    title={it.name}
+    meta="Written by {it.author} · {it.updated} · {it.version} · used {it.uses}×"
     onclose={() => overlay.closeSkill()}
   >
     {#snippet body()}
+      {#if missing}
+        <p class="mb-5 rounded-lg border border-line bg-panel-2 px-3 py-2 text-[12px] text-ink-3">
+          This skill was deleted. You are reading the last version you loaded.
+        </p>
+      {/if}
       <div class="mb-6 flex gap-1 rounded-lg bg-line-2 p-[2.5px] w-fit">
         {#each [['about', 'About'], ['used-by', 'Used by']] as [id, label] (id)}
           <button
@@ -36,17 +66,17 @@
       </div>
 
       {#if tab === 'about'}
-        <Markdown source={skill.body} />
+        <Markdown source={it.body} />
       {:else}
         <p class="mb-4 max-w-[62ch] text-[13.5px]/[1.7] text-ink-2">
           Skills are global, but attachment is per agent. These agents currently have
           <code class="rounded bg-line-2 px-[5px] py-px font-mono text-[12.5px] text-accent"
-            >{skill.name}</code
+            >{it.name}</code
           >
           attached.
         </p>
         <ul class="flex flex-col gap-2">
-          {#each skill.usedBy as agent (agent)}
+          {#each it.usedBy as agent (agent)}
             <li class="rounded-[9px] border border-line px-3 py-[9px] text-[13px]">{agent}</li>
           {/each}
         </ul>
