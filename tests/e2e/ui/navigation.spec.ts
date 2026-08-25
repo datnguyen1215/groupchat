@@ -6,8 +6,8 @@ import { ready } from '../../support/ui';
  * sidebar; Agents / Skills / Docs are global and must not render it. That is the
  * shell's central design decision, so it is what these guard.
  *
- * The rail itself always holds one `/chats/` link, so "no sidebar" means exactly
- * one such link on the page rather than none.
+ * The rail's own Chats link points at `/`, not at a thread, so a `/chats/` link
+ * on the page comes from the sidebar and nowhere else.
  */
 const chatLinks = (page: import('@playwright/test').Page) => page.locator('a[href^="/chats/"]');
 
@@ -18,7 +18,7 @@ test('root redirects into the first thread', async ({ page }) => {
 
 test('chats renders the threads sidebar', async ({ page }) => {
   await ready(page, '/');
-  expect(await chatLinks(page).count()).toBeGreaterThan(1);
+  expect(await chatLinks(page).count()).toBeGreaterThan(0);
 });
 
 for (const [, path, heading] of [
@@ -32,8 +32,7 @@ for (const [, path, heading] of [
 
     await expect(page).toHaveURL(path);
     await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
-    /* Only the rail's own Chats link survives. */
-    await expect(chatLinks(page)).toHaveCount(1);
+    await expect(chatLinks(page)).toHaveCount(0);
   });
 }
 

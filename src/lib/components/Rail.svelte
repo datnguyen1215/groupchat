@@ -1,16 +1,15 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { threads } from '$lib/data/threads';
   import { you } from '$lib/data/agents';
   import { signOut } from '$lib/auth-client';
   import Avatar from './Avatar.svelte';
   import Logo from './Logo.svelte';
 
-  /* The divider encodes scope: Chats is thread-scoped, everything below is global. */
-  const threadScoped = [
-    { href: `/chats/${threads[0].id}`, match: '/chats', glyph: '◆', label: 'Chats' }
-  ];
+  /* The divider encodes scope: Chats is thread-scoped, everything below is global.
+     Chats points at `/`, which redirects to the newest thread — a fixed id here
+     would 404 the moment that thread was deleted. */
+  const threadScoped = [{ href: '/', match: '/chats', glyph: '◆', label: 'Chats' }];
 
   const global = [
     { href: '/agents', match: '/agents', glyph: '◇', label: 'Agents' },
@@ -18,7 +17,10 @@
     { href: '/documents', match: '/documents', glyph: '▤', label: 'Docs' }
   ];
 
-  const isActive = (match: string) => page.url.pathname.startsWith(match);
+  /* `/` is the Chats section too — it redirects into a thread, or renders the
+     empty state when there are none. Either way the tab stays lit. */
+  const isActive = (match: string) =>
+    page.url.pathname.startsWith(match) || (match === '/chats' && page.url.pathname === '/');
 
   /* No name field at signup, so the address is the only label we have. */
   const email = $derived(page.data.user?.email ?? '');
