@@ -6,6 +6,7 @@ import { agentDto, documentDto, skillDto, type Stat } from './serialize';
 import { relativeTime, slugify } from './api';
 import { publish } from './events/bus';
 import { logger } from './logger';
+import { groupSteps } from './steps';
 
 /**
  * Writes log at `info`; reads do not. A read is already accounted for by the
@@ -429,35 +430,8 @@ export const listSteps = async (threadId: string) => {
     .where(eq(steps.threadId, threadId))
     .orderBy(asc(steps.seq));
 
-  const groups: { label: string; steps: unknown[] }[] = [];
-  for (const r of rows) {
-    const step = {
-      id: r.id,
-      state: r.state,
-      name: r.name,
-      detail: r.detail,
-      duration: r.durationMs === null ? 'running' : formatDuration(r.durationMs),
-      child: Boolean(r.parentId),
-      badge: r.badge ?? undefined
-    };
-    const last = groups.at(-1);
-    if (last?.label === r.groupLabel) last.steps.push(step);
-    else groups.push({ label: r.groupLabel, steps: [step] });
-  }
-  return groups as { label: string; steps: Step[] }[];
+  return groupSteps(rows);
 };
-
-type Step = {
-  id: string;
-  state: 'ok' | 'run' | 'spawn';
-  name: string;
-  detail: string;
-  duration: string;
-  child: boolean;
-  badge?: string;
-};
-
-const formatDuration = (ms: number) => (ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`);
 
 /** One tool call. Written after the call resolves, so the duration is real. */
 export const appendStep = async (input: {

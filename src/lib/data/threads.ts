@@ -31,7 +31,7 @@ export type Step = {
   badge?: string;
 };
 
-export type StepGroup = { label: string; steps: Step[] };
+export type StepGroup = { id: string; label: string; steps: Step[] };
 
 export type Thread = {
   id: string;
@@ -175,6 +175,7 @@ const retrievalEval: Thread = {
   ],
   activity: [
     {
+      id: 'g1',
       label: '10:03 · Wren',
       steps: [
         {
@@ -227,6 +228,7 @@ const retrievalEval: Thread = {
       ]
     },
     {
+      id: 'g2',
       label: '10:12 · Kestrel',
       steps: [
         {
@@ -247,6 +249,7 @@ const retrievalEval: Thread = {
       ]
     },
     {
+      id: 'g3',
       label: '10:15 · Finch',
       steps: [
         {
@@ -327,6 +330,7 @@ const ablation: Thread = {
   ],
   activity: [
     {
+      id: 'g1',
       label: '08:55 · Kestrel',
       steps: [
         {
@@ -383,6 +387,7 @@ const sparse: Thread = {
   ],
   activity: [
     {
+      id: 'g1',
       label: 'Yesterday · Wren',
       steps: [
         {
@@ -430,6 +435,7 @@ const licensing: Thread = {
   ],
   activity: [
     {
+      id: 'g1',
       label: 'Mon · Finch',
       steps: [
         { id: 'ds1', state: 'ok', name: 'skill_read', detail: 'license-check', duration: '0.1s' },

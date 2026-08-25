@@ -29,7 +29,7 @@
   </header>
 
   <div class="h-[222px] overflow-y-auto px-5 pt-3 pb-5">
-    {#each groups as group, g (group.label)}
+    {#each groups as group, g (group.id)}
       <h3
         class="pb-[5px] pl-[26px] text-[10px] font-semibold tracking-[0.07em] text-ink-3 uppercase"
         class:pt-[10px]={g > 0}
