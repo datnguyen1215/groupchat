@@ -5,7 +5,14 @@ import { eq } from 'drizzle-orm';
 import { MAX_STEPS, chatModel, noThinking } from './model';
 import { orchestratorPrompt, workerPrompt } from './prompts';
 import { orchestratorTools, workerTools, type ToolContext } from './tools';
-import { appendActivity, appendMessage, appendStep, listEntries, setAgentStatus } from '../repo';
+import {
+  BLOCKED,
+  appendActivity,
+  appendMessage,
+  appendStep,
+  listEntries,
+  setAgentStatus
+} from '../repo';
 import { logger, since } from '../logger';
 import { detailOf } from './detail';
 
@@ -131,6 +138,44 @@ const runWorker = async (threadId: string, agentId: string, task: string) => {
 };
 
 /**
+ * Hides the orchestrator's presence row for as long as it is waiting on a
+ * delegate.
+ *
+ * The row is the problem this solves: `run_agent` blocks, so the orchestrator
+ * holds a `busy` row for the whole of every delegated turn while doing nothing
+ * a reader can act on. Left visible it sits alongside the workers labelled the
+ * same way they are, which reads as one more agent working.
+ *
+ * The count matters because the model can emit several `run_agent` calls in one
+ * step and the SDK runs them concurrently. Restoring the label when any single
+ * worker returns would put the row back while the others are still going, so
+ * only the last one out clears it.
+ */
+const inFlight = new Map<string, number>();
+
+export const delegating = async <T>(agentId: string, threadId: string, run: () => Promise<T>) => {
+  const held = inFlight.get(agentId) ?? 0;
+  inFlight.set(agentId, held + 1);
+  if (!held) await setAgentStatus(agentId, 'busy', BLOCKED, threadId);
+
+  try {
+    return await run();
+  } finally {
+    const left = (inFlight.get(agentId) ?? 1) - 1;
+    if (left) inFlight.set(agentId, left);
+    else {
+      inFlight.delete(agentId);
+      /**
+       * Back to composing, which is real work and gets a row again. Still
+       * `busy`: the turn is not over, and going idle here would drop the row
+       * that `runOrchestrator`'s own `finally` is responsible for.
+       */
+      await setAgentStatus(agentId, 'busy', 'Thinking', threadId);
+    }
+  }
+};
+
+/**
  * One orchestrator turn, kicked off after the human posts. Runs to completion
  * in the background: nothing awaits it, and the browser sees the result on the
  * next refresh.
@@ -153,7 +198,9 @@ export const runOrchestrator = async (threadId: string) => {
       providerOptions: noThinking,
       system: orchestratorPrompt(orch.name),
       prompt: `Here is the conversation so far:\n\n${await transcript(threadId)}\n\nDecide what happens next.`,
-      tools: orchestratorTools(ctx, (agentId, task) => runWorker(threadId, agentId, task)),
+      tools: orchestratorTools(ctx, (agentId, task) =>
+        delegating(orch.id, threadId, () => runWorker(threadId, agentId, task))
+      ),
       stopWhen: stepCountIs(MAX_STEPS)
     });
 
