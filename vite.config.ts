@@ -2,6 +2,10 @@ import tailwindcss from '@tailwindcss/vite';
 import adapter from '@sveltejs/adapter-node';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { overrideFromDotenv } from './src/lib/server/env-override';
+
+// A stale shell export otherwise beats .env for the whole dev session.
+overrideFromDotenv();
 
 export default defineConfig({
   // Ports are pinned in the 10200+ range; see CLAUDE.md.
