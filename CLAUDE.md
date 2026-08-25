@@ -19,6 +19,8 @@
 - Tailwind CSS 4 (Vite plugin, not PostCSS).
 - Postgres via `postgres` (no ORM).
 - Vitest for unit tests. Playwright for e2e.
+- DeepSeek for AI (`@ai-sdk/deepseek`). Model is `deepseek-v4-flash` — v4 first, flash after.
+  That name is real. Do not "correct" it. Set in `src/lib/server/ai/model.ts`.
 
 ## Live updates
 

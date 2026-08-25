@@ -78,7 +78,12 @@ export const parseMarkdown = (source: string): Block[] => {
       continue;
     }
 
-    const body: string[] = [];
+    /**
+     * The first line is taken unconditionally. It reached here because no block
+     * rule claimed it, so the continuation guard below would reject it too —
+     * consuming nothing, leaving `i` where it was, and spinning this loop.
+     */
+    const body: string[] = [lines[i++]];
     while (i < lines.length && lines[i].trim() && !/^[#>|`-]/.test(lines[i])) body.push(lines[i++]);
     blocks.push({ type: 'paragraph', text: body.join(' ') });
   }
