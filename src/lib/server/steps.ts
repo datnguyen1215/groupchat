@@ -31,6 +31,10 @@ const durationText = (state: StepRow['state'], ms: number | null) => {
  *
  * That is why a group has an `id` of its own. The label is a display string —
  * it repeats, so it can never be an `{#each}` key.
+ *
+ * The id is the first step's own id — a UUID the row already carries. Nothing
+ * derived: a group id built out of `seq` is only as unique as `seq` is, and a
+ * duplicate there surfaces as `each_key_duplicate` in the drawer.
  */
 export const groupSteps = (rows: StepRow[]): StepGroup[] => {
   const groups: StepGroup[] = [];
@@ -48,7 +52,7 @@ export const groupSteps = (rows: StepRow[]): StepGroup[] => {
 
     const last = groups.at(-1);
     if (last?.label === r.groupLabel) last.steps.push(step);
-    else groups.push({ id: `g${r.seq}`, label: r.groupLabel, steps: [step] });
+    else groups.push({ id: r.id, label: r.groupLabel, steps: [step] });
   }
 
   return groups;

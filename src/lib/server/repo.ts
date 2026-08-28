@@ -404,14 +404,21 @@ export const listEntries = async (threadId: string) => {
   });
 };
 
-/** Next `seq` for a thread. Callers insert immediately after. */
-const nextSeq = async (threadId: string) => {
-  const [row] = await db
-    .select({ max: sql<number>`coalesce(max(${entries.seq}), 0)::int` })
-    .from(entries)
-    .where(eq(entries.threadId, threadId));
-  return (row?.max ?? 0) + 1;
-};
+/**
+ * The next `seq` for a thread, as a subquery — never as a value read first and
+ * written after. Two agents appending to one thread both read the same max and
+ * both write it, so a separate read is a lost update: duplicate `seq`, broken
+ * ordering, and duplicate `{#each}` keys downstream.
+ *
+ * Inlined here the read and the write are one statement, and the unique index
+ * on (thread_id, seq) turns whatever still races into an error rather than a
+ * silent collision.
+ */
+const nextEntrySeq = (threadId: string) =>
+  sql<number>`(select coalesce(max(${entries.seq}), 0)::int + 1 from ${entries} where ${entries.threadId} = ${threadId})`;
+
+const nextStepSeq = (threadId: string) =>
+  sql<number>`(select coalesce(max(${steps.seq}), 0)::int + 1 from ${steps} where ${steps.threadId} = ${threadId})`;
 
 /** Appends one message. The only way a message enters a thread. */
 export const appendMessage = async (input: {
@@ -421,18 +428,21 @@ export const appendMessage = async (input: {
   tag?: string;
   docId?: string;
 }) => {
-  const seq = await nextSeq(input.threadId);
   const id = randomUUID();
-  await db.insert(entries).values({
-    id,
-    threadId: input.threadId,
-    kind: 'message',
-    seq,
-    authorId: input.authorId,
-    tag: input.tag ?? null,
-    paragraphs: input.paragraphs,
-    docId: input.docId ?? null
-  });
+  const [written] = await db
+    .insert(entries)
+    .values({
+      id,
+      threadId: input.threadId,
+      kind: 'message',
+      seq: nextEntrySeq(input.threadId),
+      authorId: input.authorId,
+      tag: input.tag ?? null,
+      paragraphs: input.paragraphs,
+      docId: input.docId ?? null
+    })
+    .returning({ seq: entries.seq });
+  const seq = written.seq;
   log.info(
     {
       id,
@@ -460,13 +470,12 @@ export const appendMessage = async (input: {
  * text never reaches this function; it goes to the log instead.
  */
 export const appendError = async (input: { threadId: string; line: string }) => {
-  const seq = await nextSeq(input.threadId);
   const id = randomUUID();
   await db.insert(entries).values({
     id,
     threadId: input.threadId,
     kind: 'error',
-    seq,
+    seq: nextEntrySeq(input.threadId),
     label: input.line
   });
   log.info({ id, threadId: input.threadId, line: input.line }, 'error appended');
@@ -500,17 +509,12 @@ export const appendStep = async (input: {
   parentId?: string;
   badge?: string;
 }) => {
-  const [row] = await db
-    .select({ max: sql<number>`coalesce(max(${steps.seq}), 0)::int` })
-    .from(steps)
-    .where(eq(steps.threadId, input.threadId));
-  const seq = (row?.max ?? 0) + 1;
   const id = randomUUID();
   await db.insert(steps).values({
     id,
     threadId: input.threadId,
     groupLabel: input.groupLabel,
-    seq,
+    seq: nextStepSeq(input.threadId),
     state: input.state,
     name: input.name,
     detail: input.detail,

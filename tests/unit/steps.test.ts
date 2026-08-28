@@ -55,6 +55,23 @@ describe('groupSteps', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  /**
+   * The crash. Concurrent appends wrote the same `seq` to one thread, so a group
+   * id derived from `seq` repeated and the drawer threw `each_key_duplicate`.
+   * The id comes off the row's own UUID now, which duplicate `seq` cannot touch.
+   */
+  it('gives every group a unique id even when seq repeats', () => {
+    const groups = groupSteps([
+      row(59, 'Wren', { id: 'a' }),
+      row(59, 'Kestrel', { id: 'b' }),
+      row(59, 'Wren', { id: 'c' })
+    ]);
+
+    const ids = groups.map(g => g.id);
+    expect(ids).toHaveLength(3);
+    expect(new Set(ids).size).toBe(3);
+  });
+
   it('formats a running step and a finished one', () => {
     const groups = groupSteps([
       row(1, 'Wren', { durationMs: null, state: 'run' }),
