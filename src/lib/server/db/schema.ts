@@ -139,7 +139,16 @@ export const entries = pgTable('entries', {
   label: text('label'),
   bars: jsonb('bars').$type<('ok' | 'run' | 'spawn')[]>().notNull().default([]),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-});
+},
+  t => [
+    /**
+     * `seq` is the ordering key and the SSE cursor, so a duplicate is not a
+     * cosmetic problem. The index makes a racing append fail loudly instead of
+     * quietly writing a second row under a number already taken.
+     */
+    uniqueIndex('entries_thread_seq').on(t.threadId, t.seq)
+  ]
+);
 
 /**
  * What one activity row is. `ok`/`run`/`spawn` are tool calls; `say` is an
@@ -164,7 +173,9 @@ export const steps = pgTable('steps', {
   parentId: text('parent_id'),
   badge: text('badge'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
-});
+},
+  t => [uniqueIndex('steps_thread_seq').on(t.threadId, t.seq)]
+);
 
 /**
  * better-auth owns these four tables. The shapes are dictated by its drizzle
