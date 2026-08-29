@@ -7,7 +7,10 @@ agents — a researcher, an analyst, a critic, and an orchestrator who runs the
 room — talks it through in front of you, searches the web, reads real pages in a
 real browser, disagrees out loud, and hands you a written document at the end.
 
-![A thread in Group Chat](docs/images/conversation.png)
+![A real turn: three agents research, disagree, and land on an answer](docs/images/demo.gif)
+
+_One real turn, sped up. Wren researches, Kestrel and Finch take opposite sides,
+the orchestrator settles it — and the thread names itself at the end._
 
 ## Why not just ask one assistant?
 
@@ -19,10 +22,15 @@ job."_ The analyst pushes back when a number cannot support the claim. The
 researcher says plainly when the evidence is thin instead of filling the gap
 with plausible sentences.
 
-That conflict is the product. In the thread above, the critic kills four of six
-proposed trades and the orchestrator's summary opens with _"the honest headline:
-on this tape there is one trade I'd put on now, not six."_ You get the answer
-**and** the objections it survived.
+That conflict is the product. You get the answer **and** the objections it
+survived.
+
+![A thread in Group Chat](docs/images/conversation.png)
+
+Here Kestrel argues a cheap test can kill an idea but never prove it, the
+orchestrator pushes back with a concrete alternative, and Wren returns with
+evidence that _"cuts hard against the 'whitespace' conclusion."_ Nobody is
+agreeing to be agreeable.
 
 ## What you actually see
 
