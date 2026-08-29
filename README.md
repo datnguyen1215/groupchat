@@ -1,133 +1,138 @@
 # Group Chat
 
-Frontend for a web app where AI agents hold group discussions across threads,
-supervised by an orchestrator. SvelteKit 2 + Svelte 5 runes + Tailwind 4.
+**A group chat where the other participants are AI agents that argue with each other.**
 
-## Setup
+You ask a question. Instead of one assistant answering, a small team of named
+agents — a researcher, an analyst, a critic, and an orchestrator who runs the
+room — talks it through in front of you, searches the web, reads real pages in a
+real browser, disagrees out loud, and hands you a written document at the end.
+
+![A thread in Group Chat](docs/images/conversation.png)
+
+## Why not just ask one assistant?
+
+One assistant agrees with you. A room of agents with conflicting jobs does not.
+
+The critic's instructions literally say _"You argue the other side. You look for
+the assumption nobody stated and the cost nobody costed. Agreeing is not your
+job."_ The analyst pushes back when a number cannot support the claim. The
+researcher says plainly when the evidence is thin instead of filling the gap
+with plausible sentences.
+
+That conflict is the product. In the thread above, the critic kills four of six
+proposed trades and the orchestrator's summary opens with _"the honest headline:
+on this tape there is one trade I'd put on now, not six."_ You get the answer
+**and** the objections it survived.
+
+## What you actually see
+
+### Agents work in the open
+
+No spinner and a wall of text. Each agent shows what it is doing in its own
+words, with every tool call ticking off underneath as it happens.
+
+![An agent working live](docs/images/live.png)
+
+That's a real turn: Wren announcing _"Researching JSON/document storage in
+both"_ while its web searches complete one by one. Updates stream live — no
+refresh, no polling.
+
+### Every step is on the record
+
+Open the activity drawer and you get the whole audit trail, grouped by agent:
+every search, every page visited, every document written, with timings.
+
+![The activity drawer](docs/images/activity.png)
+
+If an agent claims something, you can see exactly where it went to find out.
+
+### Long answers become documents, not walls of chat
+
+Agents are told never to summarise their own document in chat — the document is
+there to be read. Chat stays conversational; the deliverable lives beside it,
+versioned and attributed.
+
+![Documents in a thread](docs/images/documents-panel.png)
+
+These are real deliverables, not bullet dumps. Here is one an agent wrote during
+a research thread — a market requirements doc with competitor pricing, cited
+Reddit threads, and a clearly stated product decision:
+
+![A document an agent wrote](docs/images/document.png)
+
+Documents from every thread collect in one place, with author and version:
+
+![All documents](docs/images/documents.png)
+
+## The cast
+
+A fixed roster. The orchestrator decides who works on what, and never answers
+you directly itself.
+
+![The agent roster](docs/images/agents.png)
+
+| Agent            | Job        | What it's for                                                      |
+| ---------------- | ---------- | ------------------------------------------------------------------ |
+| **Orchestrator** | orch       | Breaks up the ask, assigns agents, decides when the thread is done |
+| **Wren**         | researcher | Finds prior art; says when the evidence is thin                    |
+| **Kestrel**      | analyst    | Designs the measurement; reads results honestly                    |
+| **Finch**        | critic     | Argues the other side; refuses to rubber-stamp                     |
+
+The orchestrator is deliberately frugal about recruiting: _"One is often enough,
+two is common, three is rare and needs a reason."_ A second agent is for a
+different kind of work — not a second opinion on the same work.
+
+## Skills: procedures agents look up
+
+A skill is a written procedure an agent reads mid-task — how to grade retrieval
+relevance, how to read a paper for the claim versus the evidence. Agents write
+and revise them; so can you.
+
+![Skills](docs/images/skills.png)
+
+## What agents can do
+
+- **Search the web** — up to 6 distinct queries per turn, with repeat detection
+- **Drive a real browser** — navigate, read, and extract when a search snippet
+  isn't enough
+- **Read and write skills** — reusable procedures, versioned
+- **Write and revise documents** — one live document per subject; a decision is
+  an edit to the document it decides on, not a new one
+- **Talk to each other** — by name, in the thread, where you can read it
+
+## Try it
 
 Postgres runs in Docker; the app runs on the host.
 
 ```sh
 npm install
 npm run db:up         # Postgres 17 on 127.0.0.1:10201
-npm run db:migrate    # apply drizzle/ migrations
-npm run db:seed       # load src/lib/data/ fixtures into the database
+npm run db:migrate
+npm run db:seed       # loads the agent roster and skills
 npm run dev           # http://localhost:10200
 ```
 
-## Ports
+Then create an account and start a thread.
 
-Every service runs in the **10200+** range — no framework defaults. See
-`CLAUDE.md`.
+You need a `DEEPSEEK_API_KEY` in `.env` for the agents to run. Copy
+`.env.example` to `.env` and fill it in. A web search key (`TAVILY_API_KEY` or
+`SERPEX_API_KEY`) is optional — without one, agents fall back to browsing.
 
-| Port  | Service                  |
-| ----- | ------------------------ |
-| 10200 | Dev server               |
-| 10201 | Postgres (Docker)        |
-| 10202 | Test server (Playwright) |
-| 10203 | Preview server           |
+## Honest limits
 
-`.env` is optional — the defaults above are compiled in
-(`src/lib/server/db/url.ts` and `docker-compose.yml`). To override, copy
-`.env.example` to `.env` and change `POSTGRES_PORT` and `DATABASE_URL`
-together.
+- **Single node, single tenant.** There is a login, but threads and documents
+  have no owner — everyone signed in sees the same workspace.
+- **Documents have no history.** Versions bump in place; the History button is
+  inert.
+- **Creating agents and skills by hand isn't wired up.** The buttons are there;
+  the handlers aren't. Agents author skills at runtime, though.
+- **Desktop only.** The four-column shell has no responsive treatment.
 
-| Script              | What                                                   |
-| ------------------- | ------------------------------------------------------ |
-| `db:up` / `db:down` | Start / stop the Postgres container                    |
-| `db:generate`       | Generate a migration from `schema.ts` after editing it |
-| `db:migrate`        | Apply pending migrations                               |
-| `db:seed`           | Truncate and reload the fixtures. Idempotent           |
-| `db:studio`         | Drizzle Studio, a browser UI over the tables           |
+## Documentation
 
-## Tests
-
-```sh
-npm test           # 31 unit + 81 end-to-end
-npm run test:unit  # vitest
-npm run test:api   # playwright, HTTP against a real server
-npm run test:ui    # playwright, Chromium
-```
-
-Tests run against a dedicated `test` Postgres schema and never touch your
-development data. See `docs/testing.md`.
-
-## Shell
-
-Implements `mockups/b-focus-column.html` (see `handoffs/` for the design review).
-
-```
-┌──────┬───────────┬──────────────────────────┬──────────┐
-│ rail │  threads  │      conversation        │   docs   │
-│ 66px │   230px   │   (centered ~620px)      │  280px   │
-│      │           ├──────────────────────────┤ optional │
-│Chats │           │  composer                │          │
-│ ──── │           ├──────────────────────────┤          │
-│Agents│           │  activity drawer (262px) │          │
-│Skills│           │  closed by default       │          │
-│ Docs │           │                          │          │
-└──────┴───────────┴──────────────────────────┴──────────┘
-```
-
-The rail's divider encodes scope: **Chats** is thread-scoped and keeps the
-threads sidebar; **Agents / Skills / Docs** are global full-page routes.
-
-## Routes
-
-| Route         | What                                                       |
-| ------------- | ---------------------------------------------------------- |
-| `/`           | Redirects to the first thread                              |
-| `/chats/[id]` | Conversation, activity drawer, thread documents            |
-| `/agents`     | Orchestrator, research roster, agents spawned this session |
-| `/skills`     | Skill registry with filters; modal has About / Used by     |
-| `/documents`  | Every document across all threads, as a table              |
-
-## Layout
-
-```
-src/lib/
-  data/         seed fixtures — threads, agents, skills, documents
-  server/db/    schema.ts (Drizzle) and the client
-  components/   shell and shared UI
-  state/        overlay.svelte.ts — which modal is open
-  markdown.ts   parser for the fixture markdown subset
-drizzle/        generated SQL migrations
-scripts/seed.ts fixtures to database, one shot
-tests/          unit, api, ui — see docs/testing.md
-docs/           api.md, testing.md
-```
-
-## Data model
-
-Seven tables. Two decisions worth knowing:
-
-**Skills and documents are separate tables**, though both are markdown with a
-version. A skill is a reusable capability with author provenance (you vs. agent)
-and a use count; a document belongs to exactly one thread.
-
-**`usedBy` is a join, not a column.** The fixtures stored it on the skill _and_
-as a `skills` array on each agent, which could disagree. `agent_skills` is now
-the single source and the seed unions both fixture fields into it.
-
-Presentation fields the fixtures denormalized (`initials`, `color`,
-`authorColor`, `threadName`) are gone — `author_id` points at `agents`. `size`
-derives from the body length and `updated` is a real `timestamptz` rather than
-the string `'Yesterday'`.
-
-## API
-
-REST routes for **agents**, **skills**, and **documents** under `/api`. Full
-reference in `docs/api.md`. Threads and chat have no endpoints yet.
-
-## Not built
-
-**The frontend still reads `src/lib/data/` directly** — the pages do not call the
-API. Rewiring them is the next step, and it means dropping the fixtures as a
-runtime source and choosing per route between `+page.server.ts` load and client
-fetching.
-
-Also stubbed, matching the mockup's scope: skill and agent create/edit, thread
-creation, composer `@ agent` / `◈ skill` pickers, global search, `⌘K`.
-
-**No version history.** `version` is an integer bumped in place; the document
-modal's "History" button stays inert until history is modeled.
+| Doc                                  | What                                       |
+| ------------------------------------ | ------------------------------------------ |
+| [How it works](docs/how-it-works.md) | The turn loop, orchestration, live updates |
+| [Architecture](docs/architecture.md) | Stack, layout, data model, conventions     |
+| [REST API](docs/api.md)              | Endpoints for agents, skills, documents    |
+| [Testing](docs/testing.md)           | The three test layers and how to run them  |

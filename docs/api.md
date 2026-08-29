@@ -1,9 +1,9 @@
 # REST API
 
-Covers **agents**, **skills**, and **documents**. Threads and chat are not
-exposed yet — the frontend still reads `src/lib/data/threads.ts` directly.
+Covers **threads**, **agents**, **skills**, and **documents**.
 
-Base path `/api`. JSON in, JSON out. Single user, so there is no auth.
+Base path `/api`. JSON in, JSON out. Every endpoint requires a session —
+unauthenticated calls get a 401 rather than an HTML login page.
 
 ## Response shape
 
