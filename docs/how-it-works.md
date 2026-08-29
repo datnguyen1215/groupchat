@@ -86,6 +86,8 @@ publishes; add a write, publish from it.
 
 ### What you see during a turn
 
+![An agent working live](images/live.png)
+
 - **Presence rows** below the message stream — never inside it, so they can't
   overwrite a message. Avatar, name, role, "Busy", pulsing dots, and the agent's
   own status line.
@@ -96,6 +98,8 @@ publishes; add a write, publish from it.
 - **The activity drawer** — the full per-agent timeline. `finish` and
   `set_status` are omitted; they're noise. Three tools render as prose instead of
   tool names: "Wren commented", "Kestrel wrote document".
+
+![The activity drawer](images/activity.png)
 
 ### Failure handling
 

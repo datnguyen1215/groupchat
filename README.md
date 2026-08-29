@@ -25,59 +25,10 @@ with plausible sentences.
 That conflict is the product. You get the answer **and** the objections it
 survived.
 
-![A thread in Group Chat](docs/images/conversation.png)
-
-Here Kestrel argues a cheap test can kill an idea but never prove it, the
-orchestrator pushes back with a concrete alternative, and Wren returns with
-evidence that _"cuts hard against the 'whitespace' conclusion."_ Nobody is
-agreeing to be agreeable.
-
-## What you actually see
-
-### Agents work in the open
-
-No spinner and a wall of text. Each agent shows what it is doing in its own
-words, with every tool call ticking off underneath as it happens.
-
-![An agent working live](docs/images/live.png)
-
-That's a real turn: Wren announcing _"Researching JSON/document storage in
-both"_ while its web searches complete one by one. Updates stream live — no
-refresh, no polling.
-
-### Every step is on the record
-
-Open the activity drawer and you get the whole audit trail, grouped by agent:
-every search, every page visited, every document written, with timings.
-
-![The activity drawer](docs/images/activity.png)
-
-If an agent claims something, you can see exactly where it went to find out.
-
-### Long answers become documents, not walls of chat
-
-Agents are told never to summarise their own document in chat — the document is
-there to be read. Chat stays conversational; the deliverable lives beside it,
-versioned and attributed.
-
-![Documents in a thread](docs/images/documents-panel.png)
-
-These are real deliverables, not bullet dumps. Here is one an agent wrote during
-a research thread — a market requirements doc with competitor pricing, cited
-Reddit threads, and a clearly stated product decision:
-
-![A document an agent wrote](docs/images/document.png)
-
-Documents from every thread collect in one place, with author and version:
-
-![All documents](docs/images/documents.png)
-
 ## The cast
 
 A fixed roster. The orchestrator decides who works on what, and never answers
 you directly itself.
-
-![The agent roster](docs/images/agents.png)
 
 | Agent            | Job        | What it's for                                                      |
 | ---------------- | ---------- | ------------------------------------------------------------------ |
@@ -86,27 +37,34 @@ you directly itself.
 | **Kestrel**      | analyst    | Designs the measurement; reads results honestly                    |
 | **Finch**        | critic     | Argues the other side; refuses to rubber-stamp                     |
 
-The orchestrator is deliberately frugal about recruiting: _"One is often enough,
-two is common, three is rare and needs a reason."_ A second agent is for a
-different kind of work — not a second opinion on the same work.
+It is deliberately frugal about recruiting: _"One is often enough, two is common,
+three is rare and needs a reason."_ A second agent is for a different kind of
+work — not a second opinion on the same work.
 
-## Skills: procedures agents look up
+## Answers become documents, not walls of chat
 
-A skill is a written procedure an agent reads mid-task — how to grade retrieval
-relevance, how to read a paper for the claim versus the evidence. Agents write
-and revise them; so can you.
+Agents are told never to summarise their own document in chat — the document is
+there to be read. Chat stays conversational; the deliverable lives beside it,
+versioned and attributed.
 
-![Skills](docs/images/skills.png)
+These are real deliverables. Here is one an agent wrote during a research thread
+— a market requirements doc with competitor pricing, cited Reddit threads, and a
+clearly stated product decision:
+
+![A document an agent wrote](docs/images/document.png)
 
 ## What agents can do
 
 - **Search the web** — up to 6 distinct queries per turn, with repeat detection
 - **Drive a real browser** — navigate, read, and extract when a search snippet
   isn't enough
-- **Read and write skills** — reusable procedures, versioned
+- **Read and write skills** — reusable written procedures, versioned
 - **Write and revise documents** — one live document per subject; a decision is
   an edit to the document it decides on, not a new one
 - **Talk to each other** — by name, in the thread, where you can read it
+
+Every step is on the record. The activity drawer shows each search, page visit,
+and document write, grouped by agent with timings.
 
 ## Try it
 

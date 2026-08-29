@@ -45,6 +45,15 @@ docs/             this folder
 API routes live under `/api` for threads, agents, skills, documents, events, and
 auth. See [api.md](api.md).
 
+The three global pages — the roster, the skill registry, and every document
+across all threads:
+
+![The agent roster](images/agents.png)
+
+![Skills](images/skills.png)
+
+![All documents](images/documents.png)
+
 ## Shell
 
 ```
