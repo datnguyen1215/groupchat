@@ -8,6 +8,7 @@ import { orchestratorTools, workerTools, type ToolContext } from './tools';
 import { BLOCKED, appendError, listEntries, setAgentStatus } from '../repo';
 import { logger, since } from '../logger';
 import { SILENT } from './detail';
+import { generateTitle } from './title';
 
 const log = logger('agent');
 
@@ -183,6 +184,20 @@ export const runOrchestrator = async (threadId: string) => {
       },
       'turn done'
     );
+
+    /**
+     * Name the thread now the turn is over. This is the first moment the
+     * transcript holds both the question and the answer, and `titled` means it
+     * only ever happens once.
+     *
+     * Its own catch: a title is a nicety, and a failed one must not turn a turn
+     * that worked into an error in the reader's thread.
+     */
+    try {
+      await generateTitle(threadId);
+    } catch (error) {
+      log.warn({ threadId, err: error }, 'title generation failed');
+    }
   } catch (error) {
     /**
      * The turn is over and nobody is coming, so the failure has to land in the

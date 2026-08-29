@@ -344,9 +344,42 @@ export const createThread = async (name: string) => {
   return id;
 };
 
+/**
+ * A person naming the thread. Sets `titled`, which stops the generator from
+ * ever running on it — including when the name they chose is the default one.
+ */
 export const renameThread = async (id: string, name: string) => {
-  await db.update(threads).set({ name, updatedAt: new Date() }).where(eq(threads.id, id));
+  await db
+    .update(threads)
+    .set({ name, titled: true, updatedAt: new Date() })
+    .where(eq(threads.id, id));
   log.info({ id, threadName: name }, 'thread renamed');
+  publish({ scope: 'threads' });
+  publish({ scope: 'thread', threadId: id });
+};
+
+/**
+ * The generated name. Separate from `renameThread` only so the log line says
+ * which one happened; both set `titled` and both are final.
+ *
+ * The `titled` check is repeated in the WHERE clause because the read that
+ * cleared it in `generateTitle` and this write are not one transaction — two
+ * turns finishing together would otherwise both pass the check and the second
+ * would overwrite the first.
+ */
+export const titleThread = async (id: string, name: string) => {
+  const rows = await db
+    .update(threads)
+    .set({ name, titled: true, updatedAt: new Date() })
+    .where(and(eq(threads.id, id), eq(threads.titled, false)))
+    .returning({ id: threads.id });
+
+  if (!rows.length) {
+    log.info({ id, threadName: name }, 'thread title discarded — already titled');
+    return;
+  }
+
+  log.info({ id, threadName: name }, 'thread titled');
   publish({ scope: 'threads' });
   publish({ scope: 'thread', threadId: id });
 };

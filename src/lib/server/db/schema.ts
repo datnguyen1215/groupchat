@@ -49,6 +49,13 @@ export const threads = pgTable('threads', {
   group: threadGroup('group').notNull().default('Active'),
   live: boolean('live').notNull().default(false),
   unread: integer('unread').notNull().default(0),
+  /**
+   * Set once the thread has a name it is meant to keep — either the
+   * orchestrator generated one at the end of its first turn, or a person typed
+   * one. Guards the generator so it never fires twice, including on a thread
+   * someone renamed back to the default.
+   */
+  titled: boolean('titled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });

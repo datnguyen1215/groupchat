@@ -65,3 +65,36 @@ test.describe('DELETE /api/threads/[id]', () => {
     expect((await request.get(`/api/threads/${SEED_THREADS.retrievalEval}`)).status()).toBe(200);
   });
 });
+
+/**
+ * `titled` is what stops the generated title from ever running twice. It is
+ * false on a new thread and true the moment anyone names it, so the generator
+ * has one chance and a person's choice always wins.
+ */
+test.describe('thread titled flag', () => {
+  test('a new thread is untitled', async ({ request }) => {
+    const thread = await create(request);
+    expect(thread.titled).toBe(false);
+  });
+
+  test('renaming marks it titled', async ({ request }) => {
+    const thread = await create(request);
+
+    const res = await request.patch(`/api/threads/${thread.id}`, {
+      data: { name: unique('renamed') }
+    });
+
+    expect(res.status()).toBe(200);
+    expect((await res.json()).thread.titled).toBe(true);
+  });
+
+  /* Renaming it back to the default is still a choice. The flag must stick. */
+  test('stays titled when renamed to the default name', async ({ request }) => {
+    const thread = await create(request);
+    await request.patch(`/api/threads/${thread.id}`, { data: { name: 'New thread' } });
+
+    const { thread: after } = await (await request.get(`/api/threads/${thread.id}`)).json();
+    expect(after.name).toBe('New thread');
+    expect(after.titled).toBe(true);
+  });
+});
