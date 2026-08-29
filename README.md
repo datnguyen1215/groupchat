@@ -102,3 +102,7 @@ You need a `DEEPSEEK_API_KEY` in `.env` for the agents to run. Copy
 | [Architecture](docs/architecture.md) | Stack, layout, data model, conventions     |
 | [REST API](docs/api.md)              | Endpoints for agents, skills, documents    |
 | [Testing](docs/testing.md)           | The three test layers and how to run them  |
+
+## License
+
+MIT — see [LICENSE](LICENSE).
